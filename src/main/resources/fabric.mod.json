@@ -1,0 +1,20 @@
+{
+    "schemaVersion": 1,
+    "id": "specialist-dance",
+    "version": "${version}",
+    "name": "Specialist Dance",
+    "description": "Celebrate valuable items with a Specialist dance animation in your screen.",
+    "environment": "client",
+    "entrypoints": {
+        "client": [
+            "com.sebas.specialistdance.SpecialistDanceClient"
+        ]
+    },
+
+    "depends": {
+        "fabricloader": ">=0.18.1",
+        "minecraft": "1.21.11",
+        "java": ">=21",
+        "fabric-api": "*"
+    }
+}
