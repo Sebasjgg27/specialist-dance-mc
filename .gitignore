@@ -2,4 +2,6 @@
 .Ds_Store
 .gradle/
 build/
+bin/
 run/
+extract_gif.py
