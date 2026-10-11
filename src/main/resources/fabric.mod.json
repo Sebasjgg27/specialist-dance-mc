@@ -4,6 +4,15 @@
     "version": "${version}",
     "name": "Specialist Dance",
     "description": "Celebrate valuable items with a Specialist dance animation in your screen.",
+    "authors": [
+        "Sebasjgg27"
+    ],
+    "contact": {
+        "homepage": "https://github.com/Sebasjgg27/specialist-dance-mc",
+        "sources": "https://github.com/Sebasjgg27/specialist-dance-mc"
+    },
+    "license": "MIT",
+    "icon": "assets/specialist-dance/icon.png",
     "environment": "client",
     "entrypoints": {
         "client": [
