@@ -7,16 +7,17 @@
 - Mod loader: Fabric (Loader 0.18.1, Fabric API 0.141.5+1.21.11)
 - Language: Java 21
 - Build system: Gradle 9.2.1 with Loom (declared as net.fabricmc.fabric-loom-remap 1.14.10)
-- Maven group: com.sebas.specialistdance · Mod version: 1.0.0 · Archive name: specialist-dance
+- Maven group: com.sebas.specialistdance · Mod version: 1.1.0 · Archive name: specialist-dance
 - Mod manifest id: specialist-dance · Environment: client
 
-Goal: A client-side mod inspired by the Persona 4 "Specialist Dance" meme. When the player picks up a valuable item (starting with diamonds), a frame-by-frame dance animation is drawn as a HUD overlay in the center of the screen.
+Goal: A client-side mod inspired by the Persona 4 "Specialist Dance" meme. When the player picks up a valuable item (diamond, emerald, gold, iron, netherite — ingots and blocks), a frame-by-frame dance animation is drawn as a HUD overlay in the center of the screen.
 
 ## 2. Current Features
 
-- Diamond detection: the client counts diamonds in the player's inventory every tick and triggers the animation when the count increases.
+- Valuable-item detection: the client counts each tracked item in the player's inventory every tick and triggers the animation when any tracked count increases.
+- Tracked items: diamond, emerald, gold ingot, iron ingot, netherite ingot, and the block variants of each.
 - Dance animation: a 147-frame PNG sequence played back as a HUD overlay (centered, 160×160 px, 50 ms per frame).
-- Configurable-in-code constants: `FRAME_COUNT`, `FRAME_DURATION_MS`, and `DRAW_SIZE` in `SpecialistDanceClient`.
+- Configurable-in-code constants: `TRACKED_ITEMS`, `FRAME_COUNT`, `FRAME_DURATION_MS`, and `DRAW_SIZE` in `SpecialistDanceClient`.
 
 ## 3. Current Project Structure
 
@@ -56,18 +57,36 @@ The code loads textures from the `textures/gui/frames/` path via `Identifier.fro
 ```java
 package com.sebas.specialistdance;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
 public class SpecialistDanceClient implements ClientModInitializer {
 
-    private int previousDiamondCount = -1;
+    private static final List<Item> TRACKED_ITEMS = List.of(
+        Items.DIAMOND,
+        Items.EMERALD,
+        Items.GOLD_INGOT,
+        Items.IRON_INGOT,
+        Items.NETHERITE_INGOT,
+        Items.DIAMOND_BLOCK,
+        Items.EMERALD_BLOCK,
+        Items.GOLD_BLOCK,
+        Items.IRON_BLOCK,
+        Items.NETHERITE_BLOCK
+    );
+
+    private final Map<Item, Integer> previousCounts = new HashMap<>();
     private long animationStartMillis = -1;
 
     private static final int FRAME_COUNT = 147;
@@ -78,7 +97,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
     public void onInitializeClient() {
         System.out.println("Specialist Dance is Ready!");
 
-        ClientTickEvents.END_CLIENT_TICK.register(this::checkForDiamonds);
+        ClientTickEvents.END_CLIENT_TICK.register(this::checkForValuableItems);
 
         HudElementRegistry.addLast(
             Identifier.fromNamespaceAndPath(
@@ -119,31 +138,44 @@ public class SpecialistDanceClient implements ClientModInitializer {
         );
     }
 
-    private void checkForDiamonds(Minecraft client) {
+    private void checkForValuableItems(Minecraft client) {
         if (client.player == null || client.level == null) {
+            previousCounts.clear();
             return;
         }
 
-        int currentDiamondCount = 0;
+        Map<Item, Integer> currentCounts = new HashMap<>();
+
+        for (Item item : TRACKED_ITEMS) {
+            currentCounts.put(item, 0);
+        }
 
         for (int i = 0; i < client.player.getInventory().getContainerSize(); i++) {
             ItemStack stack = client.player.getInventory().getItem(i);
+            Item item = stack.getItem();
 
-            if (stack.is(Items.DIAMOND)) {
-                currentDiamondCount += stack.getCount();
+            if (currentCounts.containsKey(item)) {
+                currentCounts.merge(item, stack.getCount(), Integer::sum);
             }
         }
 
-        if (previousDiamondCount == -1) {
-            previousDiamondCount = currentDiamondCount;
-            return;
+        boolean gainedValuableItem = false;
+
+        for (Item item : TRACKED_ITEMS) {
+            int previousCount = previousCounts.getOrDefault(item, 0);
+            int currentCount = currentCounts.getOrDefault(item, 0);
+
+            if (currentCount > previousCount) {
+                gainedValuableItem = true;
+                break;
+            }
         }
 
-        if (currentDiamondCount > previousDiamondCount) {
+        if (gainedValuableItem) {
             animationStartMillis = System.currentTimeMillis();
+            previousCounts.clear();
+            previousCounts.putAll(currentCounts);
         }
-
-        previousDiamondCount = currentDiamondCount;
     }
 }
 ```
@@ -151,7 +183,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
 ### How it works
 
 - `onInitializeClient()` registers a client tick callback and a HUD render callback.
-- `checkForDiamonds()` runs every client tick, sums all diamond stacks in the inventory, and starts the animation when the total increases. The first run just records the baseline (`previousDiamondCount == -1`).
+- `checkForValuableItems()` runs every client tick, counts each tracked item in the inventory, and starts the animation when any tracked total increases. The baseline is reset when no player/level is present.
 - The HUD element computes the current frame from elapsed time and blits the corresponding PNG centered on screen, then stops once `FRAME_COUNT` is exceeded.
 
 ### Mod manifest
@@ -181,21 +213,21 @@ public class SpecialistDanceClient implements ClientModInitializer {
 - Detecting diamonds — Completed
 - Rendering a dancing animation — Completed
 - In-game verification on a real dev client — Pending
-- Additional trigger items (gold, emeralds, iron, netherite, etc.) — Not implemented
+- Additional trigger items (gold, emeralds, iron, netherite, etc.) — Completed
 - In-game config (duration/size/position/cooldown) — Not implemented
 - Character/config options — Not implemented
 
 ## 7. Known Issues / Notes
 
-- The animation triggers on a diamond count increase; dropping and re-picking up diamonds will re-trigger it.
-- Item detection is hardcoded to `Items.DIAMOND` and reads the inventory every tick.
+- The animation triggers on a tracked-item count increase; dropping and re-picking up a tracked item will re-trigger it.
+- The tracked item set is hardcoded in the `TRACKED_ITEMS` list and the inventory is read every tick.
 
 ## 8. Immediate Next Steps
 
 1. Run `./gradlew clean build` and confirm `BUILD SUCCESSFUL`.
 2. Run `./gradlew runClient`, confirm the client reaches the main menu, and verify `run/logs/latest.log` contains `Specialist Dance is Ready!`.
-3. Test in-game: obtain a diamond and confirm the dance animation plays centered on screen.
-4. Generalize detection into a configurable item set instead of the hardcoded diamond.
+3. Test in-game: obtain a tracked item and confirm the dance animation plays centered on screen.
+4. Make the tracked item set user-configurable instead of the hardcoded `TRACKED_ITEMS` list.
 5. Add animation controls (duration, size, position, cooldown) and a config file.
 6. Add optional sound and additional characters/animations.
 
@@ -205,4 +237,4 @@ Build manually as a learning exercise, work in small testable steps, and verify 
 
 ## 10. Overall Status
 
-The mod now detects diamonds and plays a 147-frame dance animation HUD overlay. It compiles into a jar (`build/libs/specialist-dance-1.0.0.jar`). Remaining work is in-game verification plus generalizing the trigger to more items and adding config options.
+The mod now detects multiple valuable items (diamond, emerald, gold, iron, netherite — ingots and blocks) and plays a 147-frame dance animation HUD overlay. It compiles into a jar (`build/libs/specialist-dance-1.1.0.jar`). Remaining work is in-game verification plus making the trigger set configurable and adding config options.
