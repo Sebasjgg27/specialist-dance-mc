@@ -1,5 +1,8 @@
-
 package com.sebas.specialistdance;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -7,13 +10,27 @@ import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
 public class SpecialistDanceClient implements ClientModInitializer {
 
-    private int previousDiamondCount = -1;
+    private static final List<Item> TRACKED_ITEMS = List.of(
+        Items.DIAMOND,
+        Items.EMERALD,
+        Items.GOLD_INGOT,
+        Items.IRON_INGOT,
+        Items.NETHERITE_INGOT,
+        Items.DIAMOND_BLOCK,
+        Items.EMERALD_BLOCK,
+        Items.GOLD_BLOCK,
+        Items.IRON_BLOCK,
+        Items.NETHERITE_BLOCK
+    );
 
+    private final Map<Item, Integer> previousCounts = new HashMap<>();
+    private boolean inventoryInizialized = false;
     private long animationStartMillis = -1;
 
     private static final int FRAME_COUNT = 147;
@@ -24,7 +41,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
     public void onInitializeClient() {
         System.out.println("Specialist Dance is Ready!");
 
-        ClientTickEvents.END_CLIENT_TICK.register(this::checkForDiamonds);
+        ClientTickEvents.END_CLIENT_TICK.register(this::checkForValuableItems);
 
         HudElementRegistry.addLast(
             Identifier.fromNamespaceAndPath(
@@ -70,35 +87,47 @@ public class SpecialistDanceClient implements ClientModInitializer {
             }
         );
     }
-
-    private void checkForDiamonds(Minecraft client) {
+    
+private void checkForValuableItems(Minecraft client) {
         if (client.player == null || client.level == null) {
+            previousCounts.clear();
+            inventoryInizialized = false;
             return;
         }
 
-        int currentDiamondCount = 0;
+    Map<Item, Integer> currentCounts = new HashMap<>();
 
-        for (
-            int i = 0;
-            i < client.player.getInventory().getContainerSize();
-            i++
-        ) {
-            ItemStack stack = client.player.getInventory().getItem(i);
-
-            if (stack.is(Items.DIAMOND)) {
-                currentDiamondCount += stack.getCount();
-            }
-        }
-
-        if (previousDiamondCount == -1) {
-            previousDiamondCount = currentDiamondCount;
-            return;
-        }
-
-        if (currentDiamondCount > previousDiamondCount) {
-            animationStartMillis = System.currentTimeMillis();
-        }
-
-        previousDiamondCount = currentDiamondCount;
+    for (Item item : TRACKED_ITEMS) {
+        currentCounts.put(item, 0);
     }
+
+    for (int i = 0; i < client.player.getInventory().getContainerSize(); i++) {
+        ItemStack stack = client.player.getInventory().getItem(i);
+        Item item = stack.getItem();
+
+        if (currentCounts.containsKey(item)) {
+            currentCounts.merge(item, stack.getCount(), Integer::sum);
+        }
+    }
+
+    boolean gainedValuableItem = false;
+
+    for (Item item : TRACKED_ITEMS) {
+        int previousCount = previousCounts.getOrDefault(item, 0);
+        int currentCount = currentCounts.getOrDefault(item, 0);
+
+        if (currentCount > previousCount) {
+            gainedValuableItem = true;
+            break;
+        }
+    }
+
+    if (gainedValuableItem) {
+        animationStartMillis = System.currentTimeMillis();
+
+        previousCounts.clear();
+        previousCounts.putAll(currentCounts);
+    }
+}
+
 }
