@@ -30,7 +30,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
     );
 
     private final Map<Item, Integer> previousCounts = new HashMap<>();
-    private boolean inventoryInizialized = false;
+    private boolean inventoryInitialized = false;
     private long animationStartMillis = -1;
 
     private static final int FRAME_COUNT = 147;
@@ -91,7 +91,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
 private void checkForValuableItems(Minecraft client) {
         if (client.player == null || client.level == null) {
             previousCounts.clear();
-            inventoryInizialized = false;
+            inventoryInitialized = false;
             return;
         }
 
@@ -110,24 +110,42 @@ private void checkForValuableItems(Minecraft client) {
         }
     }
 
-    boolean gainedValuableItem = false;
+    ItemStack carriedStack =client.player.containerMenu.getCarried();
 
+    if (!carriedStack.isEmpty()) {
+        Item carriedItem = carriedStack.getItem();
+
+        if (currentCounts.containsKey(carriedItem)) {
+            currentCounts.merge(
+                carriedItem,
+                carriedStack.getCount(),
+                Integer::sum
+            );
+        }
+    }
+
+    // Establish the initial inventor without triggering the dance animation
+    if (!inventoryInitialized) {
+        previousCounts.clear();
+        previousCounts.putAll(currentCounts);
+        inventoryInitialized = true;
+        return;
+    }
+
+    //detect an increase in the total quantity of any tracked item
     for (Item item : TRACKED_ITEMS) {
         int previousCount = previousCounts.getOrDefault(item, 0);
         int currentCount = currentCounts.getOrDefault(item, 0);
 
         if (currentCount > previousCount) {
-            gainedValuableItem = true;
+            animationStartMillis = System.currentTimeMillis();
             break;
         }
     }
 
-    if (gainedValuableItem) {
-        animationStartMillis = System.currentTimeMillis();
+    //always refresh the baseline, even when items where removed
+    previousCounts.clear();
+    previousCounts.putAll(currentCounts);
 
-        previousCounts.clear();
-        previousCounts.putAll(currentCounts);
     }
-}
-
 }

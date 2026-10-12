@@ -10,7 +10,7 @@
 - Maven group: com.sebas.specialistdance · Mod version: 1.1.0 · Archive name: specialist-dance
 - Mod manifest id: specialist-dance · Environment: client
 
-Goal: A client-side mod inspired by the Persona 4 "Specialist Dance" meme. When the player picks up a valuable item (diamond, emerald, gold, iron, netherite — ingots and blocks), a frame-by-frame dance animation is drawn as a HUD overlay in the center of the screen.
+Goal: A client-side mod inspired by the Persona 4 and The Binding of Isaac "Specialist Dance" meme. When the player picks up a valuable item (diamond, emerald, gold, iron, netherite — ingots and blocks), a frame-by-frame dance animation is drawn as a HUD overlay in the center of the screen.
 
 ## 2. Current Features
 
