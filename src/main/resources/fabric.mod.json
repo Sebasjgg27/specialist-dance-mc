@@ -23,7 +23,7 @@
     "mixins": [
         {
             "config": "specialist-dance.client.mixins.json",
-            "enviroment": "client"
+            "environment": "client"
         }
     ],
 

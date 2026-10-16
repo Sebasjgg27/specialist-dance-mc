@@ -1,11 +1,10 @@
 package com.sebas.specialistdance.mixin;
 
+import com.sebas.specialistdance.SpecialistDanceClient;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.protocol.game.ClientboundTakeItemEntityPacket;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.item.ItemStack;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -17,7 +16,7 @@ public abstract class ClientPacketListenerMixin {
 
     @Inject(
         method = "handleTakeItemEntity",
-        at = @At("HEAD")
+        at = @At("RETURN")
     )
     private void specialistDance$onItemPickup(
         ClientboundTakeItemEntityPacket packet,
@@ -28,23 +27,15 @@ public abstract class ClientPacketListenerMixin {
         if (client.player == null || client.level == null) {
             return;
         }
-        if (packet.getPlayerId() != client.player.getId()){
-            return;
-        }
-        Entity entity = client.level.getEntity(packet.getItemId());
 
-        if (!(entity instanceof ItemEntity itemEntity)) {
+        if (packet.getPlayerId() != client.player.getId()) {
             return;
         }
 
-        ItemStack stack = itemEntity.getItem();
+        SpecialistDanceClient mod = SpecialistDanceClient.getInstance();
 
-        System.out.println(
-            "Specialist Dance observed pickup: "
-                + stack.getItem()
-        );
-
+        if (mod != null) {
+            mod.onItemPickup(packet.getItemId());
+        }
     }
-
 }
-
