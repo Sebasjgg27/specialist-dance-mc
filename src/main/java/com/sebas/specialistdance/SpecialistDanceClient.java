@@ -37,9 +37,8 @@ public class SpecialistDanceClient implements ClientModInitializer {
         Items.ANCIENT_DEBRIS
     );
 
-    private static final long ORE_TIMEOUT_MS = 10_000L;
-    private static final long LINK_TIMEOUT_MS = 30_000L;
-    private static final double ORE_SEARCH_RADIUS_SQUARE = 16.0;
+    private SpecialistDanceConfig config;
+    private long lastTriggerMillis = -1;
 
     private record PendingOre(Item expectedItem, long createdAtMillis) {}
 
@@ -57,8 +56,6 @@ public class SpecialistDanceClient implements ClientModInitializer {
     private long animationStartMillis = -1;
 
     private static final int FRAME_COUNT = 147;
-    private static final int FRAME_DURATION_MS = 50;
-    private static final int DRAW_SIZE = 160;
 
     public static SpecialistDanceClient getInstance() {
         return instance;
@@ -67,8 +64,14 @@ public class SpecialistDanceClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         instance = this;
+        config = SpecialistDanceConfig.load();
 
         System.out.println("Specialist Dance is Ready!");
+
+        if(!config.enabled) {
+            System.out.println("Specialist Dance: disabled via config");
+            return;
+        }
 
         ClientPlayerBlockBreakEvents.AFTER.register(
             (world, player, pos, state) -> {
@@ -90,7 +93,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
                     new PendingOre(expectedItem, System.currentTimeMillis())
                 );
 
-                System.out.println(
+                log(
                     "Specialist Dance: registered ore "
                     + state.getBlock()
                     + " -> " + expectedItem
@@ -122,7 +125,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
 
                 long elapsed = System.currentTimeMillis() - animationStartMillis;
 
-                int frameIndex = (int) (elapsed / FRAME_DURATION_MS);
+                int frameIndex = (int) (elapsed / config.frameDurationMs);
 
                 if (frameIndex >= FRAME_COUNT) {
                     animationStartMillis = -1;
@@ -134,8 +137,13 @@ public class SpecialistDanceClient implements ClientModInitializer {
                     "textures/gui/frames/frame_%03d.png".formatted(frameIndex)
                 );
 
-                int x = (graphics.guiWidth() - DRAW_SIZE) / 2;
-                int y = (graphics.guiHeight() - DRAW_SIZE) / 2;
+                int size = config.drawSize;
+                int x = config.positionX >= 0
+                    ? config.positionX
+                    : (graphics.guiWidth() - size) / 2;
+                int y = config.positionY >= 0
+                    ? config.positionY
+                    : (graphics.guiHeight() - size) / 2;
 
                 graphics.blit(
                     RenderPipelines.GUI_TEXTURED,
@@ -144,13 +152,19 @@ public class SpecialistDanceClient implements ClientModInitializer {
                     y,
                     0.0f,
                     0.0f,
-                    DRAW_SIZE,
-                    DRAW_SIZE,
-                    DRAW_SIZE,
-                    DRAW_SIZE
+                    size,
+                    size,
+                    size,
+                    size
                 );
             }
         );
+    }
+
+    private void log(String message) {
+        if (config.debug) {
+            System.out.println(message);
+        }
     }
 
     private void tick(Minecraft client) {
@@ -166,11 +180,11 @@ public class SpecialistDanceClient implements ClientModInitializer {
         long now = System.currentTimeMillis();
 
         pendingOres.entrySet().removeIf(
-            entry -> now - entry.getValue().createdAtMillis() > ORE_TIMEOUT_MS
+            entry -> now - entry.getValue().createdAtMillis() > config.oreTimeoutMs
         );
 
         dropLinks.entrySet().removeIf(
-            entry -> now - entry.getValue().linkedAtMillis() > LINK_TIMEOUT_MS
+            entry -> now - entry.getValue().linkedAtMillis() > config.linkTimeoutMs
         );
 
         resolvePendingDrops(client, now);
@@ -192,7 +206,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
             ItemStack stack = itemEntity.getItem();
 
             if (stack.isEmpty()) {
-                if (now - entry.getValue() > 2000L) {
+                if (now - entry.getValue() > config.dropResolveTimeoutMs) {
                     iterator.remove();
                 }
                 continue;
@@ -220,7 +234,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
                 new DropLink(sourceOre, System.currentTimeMillis())
             );
 
-            System.out.println(
+            log(
                 "Specialist Dance: linked drop "
                 + droppedItem
                 + " (entity " + itemEntity.getId() + ")"
@@ -237,7 +251,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
         for (Map.Entry<BlockPos, PendingOre> entry : pendingOres.entrySet()) {
             PendingOre pending = entry.getValue();
 
-            if (now - pending.createdAtMillis() > ORE_TIMEOUT_MS) {
+            if (now - pending.createdAtMillis() > config.oreTimeoutMs) {
                 continue;
             }
 
@@ -247,7 +261,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
 
             double distance = entry.getKey().distSqr(itemPos);
 
-            if (distance <= ORE_SEARCH_RADIUS_SQUARE && distance < bestDistance) {
+            if (distance <= config.searchRadiusSquared && distance < bestDistance) {
                 bestDistance = distance;
                 best = entry.getKey();
             }
@@ -264,7 +278,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
         }
 
         if (triggeredOres.add(link.orePos())) {
-            System.out.println(
+            log(
                 "Specialist Dance: activated for ore at " + link.orePos()
             );
             triggerDance();
@@ -294,6 +308,15 @@ public class SpecialistDanceClient implements ClientModInitializer {
     }
 
     public void triggerDance() {
-        animationStartMillis = System.currentTimeMillis();
+        long now = System.currentTimeMillis();
+
+        if (config.cooldownMs > 0
+                && lastTriggerMillis >= 0
+                && now - lastTriggerMillis < config.cooldownMs) {
+            return;
+        }
+
+        lastTriggerMillis = now;
+        animationStartMillis = now;
     }
 }

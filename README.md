@@ -1,240 +1,143 @@
-# Specialist Dance Minecraft Mod: Project Summary
+# Specialist Dance
 
-## 1. Project Overview
+A **client-side** Fabric mod. When you mine a valuable ore and pick up its drop, a 147-frame dance animation plays in the middle of your screen — the "Specialist" dance meme from *Persona 4* and *The Binding of Isaac*.
 
-- Project name: Specialist Dance
-- Minecraft version: Java Edition 1.21.11
-- Mod loader: Fabric (Loader 0.18.1, Fabric API 0.141.5+1.21.11)
-- Language: Java 21
-- Build system: Gradle 9.2.1 with Loom (declared as net.fabricmc.fabric-loom-remap 1.14.10)
-- Maven group: com.sebas.specialistdance · Mod version: 1.1.0 · Archive name: specialist-dance
-- Mod manifest id: specialist-dance · Environment: client
+The trigger is origin-aware on purpose: digging up a diamond ore and grabbing the diamond celebrates. Pulling a diamond out of a chest, trading with a villager, or walking over loot someone else dropped does **not**.
 
-Goal: A client-side mod inspired by the Persona 4 and The Binding of Isaac "Specialist Dance" meme. When the player picks up a valuable item (diamond, emerald, gold, iron, netherite — ingots and blocks), a frame-by-frame dance animation is drawn as a HUD overlay in the center of the screen.
+- **Minecraft:** Java Edition 1.21.11
+- **Loader:** Fabric 0.18.1
+- **API:** Fabric API 0.141.5+1.21.11
+- **Language:** Java 21
+- **Environment:** client only
 
-## 2. Current Features
+---
 
-- Valuable-item detection: the client counts each tracked item in the player's inventory every tick and triggers the animation when any tracked count increases.
-- Tracked items: diamond, emerald, gold ingot, iron ingot, netherite ingot, and the block variants of each.
-- Dance animation: a 147-frame PNG sequence played back as a HUD overlay (centered, 160×160 px, 50 ms per frame).
-- Configurable-in-code constants: `TRACKED_ITEMS`, `FRAME_COUNT`, `FRAME_DURATION_MS`, and `DRAW_SIZE` in `SpecialistDanceClient`.
+## Features
 
-## 3. Current Project Structure
+- **Mining-origin detection** — remembers the ore you break, links the drop to it, and triggers only on pickup of that drop.
+- **Tracked ores** — the six valuable ones below, deepslate variants included.
+- **No false positives** — chests, mobs, trades and old ground loot are ignored.
+- **No double triggers** — a Fortune vein can drop several items but only dances once.
+- **Configurable** — timings, radius, animation size/position/speed and an on/off switch live in a JSON file.
+- **Zero noise** — debug logging is off by default.
 
-Actual layout (verified):
+## Tracked ores
 
-```text
-specialist-dance-mc/
-├── build.gradle
-├── gradle.properties
-├── settings.gradle
-├── gradlew / gradlew.bat
-├── gradle/wrapper/ (gradle-wrapper.jar, gradle-wrapper.properties)
-├── .gitignore
-├── LICENSE
-├── README.md
-├── extract_gif.py        (helper, gitignored — extracts GIF frames to PNG)
-├── src/main/
-│   ├── java/com/sebas/specialistdance/SpecialistDanceClient.java
-│   └── resources/
-│       ├── fabric.mod.json
-│       └── assets/specialist-dance/
-│           └── textures/gui/frames/frame_000.png … frame_146.png (147 frames)
-├── build/   (generated, untracked)
-├── bin/     (VS Code build output, untracked)
-├── .gradle/ (generated, untracked)
-└── run/     (generated dev-run data, untracked)
+| Ore | Drop |
+|---|---|
+| Diamond Ore / Deepslate Diamond Ore | Diamond |
+| Emerald Ore / Deepslate Emerald Ore | Emerald |
+| Gold Ore / Deepslate Gold Ore | Raw Gold |
+| Nether Gold Ore | Gold Nugget |
+| Iron Ore / Deepslate Iron Ore | Raw Iron |
+| Ancient Debris | Ancient Debris |
+
+Anything else — including copper, lapis, redstone and coal — is ignored.
+
+## Installation
+
+1. Install [Fabric Loader](https://fabricmc.net/use/installer/) for 1.21.11 and **Fabric API**.
+2. Drop `specialist-dance-1.2.0.jar` into your `mods/` folder.
+3. Launch the game — you should see `Specialist Dance is Ready!` in the log.
+
+The mod does not need to be installed on the server.
+
+## Configuration
+
+A config file is created on first launch:
+
+- Dev client: `run/config/specialist-dance.json`
+- Normal install: `.minecraft/config/specialist-dance.json`
+
+Missing keys fall back to defaults and are added back to the file automatically.
+
+| Setting | Default | What it does |
+|---|---|---|
+| `enabled` | `true` | Turn the whole mod on or off. |
+| `debug` | `false` | Log the detection pipeline to the console. |
+| `oreTimeoutMs` | `10000` | How long a broken ore can still claim a drop. |
+| `linkTimeoutMs` | `30000` | How long a linked drop can still trigger a dance. |
+| `searchRadiusSquared` | `16.0` | Max distance (squared blocks) from drop to ore — `16` = 4 blocks. |
+| `dropResolveTimeoutMs` | `2000` | How long to wait for an item entity to receive its item data. |
+| `frameDurationMs` | `50` | Milliseconds per animation frame. |
+| `drawSize` | `160` | Size of the animation on screen, in pixels. |
+| `positionX` | `-1` | X position; `-1` centres it horizontally. |
+| `positionY` | `-1` | Y position; `-1` centres it vertically. |
+| `cooldownMs` | `0` | Minimum gap between dances; `0` = none. |
+
+**Tip:** set `"debug": true` to watch the pipeline — it prints three lines per ore:
+
+```
+registered ore -> linked drop -> activated for ore
 ```
 
-The code loads textures from the `textures/gui/frames/` path via `Identifier.fromNamespaceAndPath("specialist-dance", "textures/gui/frames/frame_XXX.png")`, which is the only frame location in the project.
+## How it works
 
-## 4. Current Implementation
+1. **Break** — breaking a tracked ore records its position and expected drop for a few seconds.
+2. **Link** — the item entity spawns empty (the server sends its contents in a later packet), so the mod waits a tick, reads the item, and links it back to the nearby broken ore.
+3. **Pickup** — a Mixin notices when *you* collect that entity; if it's linked, the dance starts. Each ore position can only trigger once.
 
-### Java entry point
+State is cleared when you change world or dimension, and entries expire on their own.
 
-`src/main/java/com/sebas/specialistdance/SpecialistDanceClient.java`
+## Testing
 
-```java
-package com.sebas.specialistdance;
+Run in **Survival** — Creative mining drops nothing.
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+| Scenario | Expected |
+|---|---|
+| Mine and collect a tracked ore | Three log lines (with `debug`) + dance |
+| Break dirt or stone | Nothing |
+| Open a chest / trade / grab old ground loot | Nothing |
+| Mine with Fortune | Several `linked drop`, one `activated` |
+| Re-mine the same spot | Triggers again |
+| Switch world or dimension | No stale trigger |
 
-import net.fabricmc.api.ClientModInitializer;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
+## Troubleshooting
 
-public class SpecialistDanceClient implements ClientModInitializer {
+**The dance never plays.** Check, in order:
 
-    private static final List<Item> TRACKED_ITEMS = List.of(
-        Items.DIAMOND,
-        Items.EMERALD,
-        Items.GOLD_INGOT,
-        Items.IRON_INGOT,
-        Items.NETHERITE_INGOT,
-        Items.DIAMOND_BLOCK,
-        Items.EMERALD_BLOCK,
-        Items.GOLD_BLOCK,
-        Items.IRON_BLOCK,
-        Items.NETHERITE_BLOCK
-    );
+1. You're in **Survival** — Creative mining drops nothing.
+2. The item came from a chest, trade, mob or old ground loot instead of the ore you just broke.
+3. The drop landed more than 4 blocks from the ore, or you picked it up more than 30 s later.
+4. `"enabled"` is `false` in the config.
+5. `"debug"` is `false`, so the pipeline prints nothing — turn it on and watch for `registered` → `linked` → `activated`.
 
-    private final Map<Item, Integer> previousCounts = new HashMap<>();
-    private long animationStartMillis = -1;
+## Building & running
 
-    private static final int FRAME_COUNT = 147;
-    private static final int FRAME_DURATION_MS = 50;
-    private static final int DRAW_SIZE = 160;
+Prerequisites: JDK 21 and Git. Gradle is included in the repo.
 
-    @Override
-    public void onInitializeClient() {
-        System.out.println("Specialist Dance is Ready!");
-
-        ClientTickEvents.END_CLIENT_TICK.register(this::checkForValuableItems);
-
-        HudElementRegistry.addLast(
-            Identifier.fromNamespaceAndPath(
-                "specialist-dance",
-                "specialist_dance_overlay"
-            ),
-            (graphics, deltaTracker) -> {
-                if (animationStartMillis < 0) {
-                    return;
-                }
-
-                long elapsed = System.currentTimeMillis()
-                    - animationStartMillis;
-
-                int frameIndex = (int) (elapsed / FRAME_DURATION_MS);
-
-                if (frameIndex >= FRAME_COUNT) {
-                    animationStartMillis = -1;
-                    return;
-                }
-
-                Identifier texture = Identifier.fromNamespaceAndPath(
-                        "specialist-dance",
-                        "textures/gui/frames/frame_%03d.png"
-                            .formatted(frameIndex)
-                    );
-
-                int x = (graphics.guiWidth() - DRAW_SIZE) / 2;
-                int y = (graphics.guiHeight() - DRAW_SIZE) / 2;
-
-                graphics.blit(
-                    RenderPipelines.GUI_TEXTURED,
-                    texture,
-                    x, y, 0.0f, 0.0f,
-                    DRAW_SIZE, DRAW_SIZE, DRAW_SIZE, DRAW_SIZE
-                );
-            }
-        );
-    }
-
-    private void checkForValuableItems(Minecraft client) {
-        if (client.player == null || client.level == null) {
-            previousCounts.clear();
-            return;
-        }
-
-        Map<Item, Integer> currentCounts = new HashMap<>();
-
-        for (Item item : TRACKED_ITEMS) {
-            currentCounts.put(item, 0);
-        }
-
-        for (int i = 0; i < client.player.getInventory().getContainerSize(); i++) {
-            ItemStack stack = client.player.getInventory().getItem(i);
-            Item item = stack.getItem();
-
-            if (currentCounts.containsKey(item)) {
-                currentCounts.merge(item, stack.getCount(), Integer::sum);
-            }
-        }
-
-        boolean gainedValuableItem = false;
-
-        for (Item item : TRACKED_ITEMS) {
-            int previousCount = previousCounts.getOrDefault(item, 0);
-            int currentCount = currentCounts.getOrDefault(item, 0);
-
-            if (currentCount > previousCount) {
-                gainedValuableItem = true;
-                break;
-            }
-        }
-
-        if (gainedValuableItem) {
-            animationStartMillis = System.currentTimeMillis();
-            previousCounts.clear();
-            previousCounts.putAll(currentCounts);
-        }
-    }
-}
+```
+./gradlew build          # jar lands in build/libs/
+./gradlew runClient      # launch a dev client
+./gradlew build --offline  # when your dependencies are already cached
 ```
 
-### How it works
+The first build needs network access to Fabric's Maven and Mojang's version manifest.
 
-- `onInitializeClient()` registers a client tick callback and a HUD render callback.
-- `checkForValuableItems()` runs every client tick, counts each tracked item in the inventory, and starts the animation when any tracked total increases. The baseline is reset when no player/level is present.
-- The HUD element computes the current frame from elapsed time and blits the corresponding PNG centered on screen, then stops once `FRAME_COUNT` is exceeded.
+## Project files
 
-### Mod manifest
+- `SpecialistDanceClient.java` — entry point, detection pipeline, tick cleanup and HUD animation.
+- `SpecialistDanceConfig.java` — the JSON config model.
+- `mixin/ClientPacketListenerMixin.java` — reports pickups of the local player.
+- `assets/specialist-dance/` — icon plus the 147 animation frames.
 
-`src/main/resources/fabric.mod.json`
+## Technical notes
 
-- id: specialist-dance
-- environment: client
-- entrypoint (client): com.sebas.specialistdance.SpecialistDanceClient
-- depends: fabricloader >=0.18.1, minecraft 1.21.11 (pinned exact), java >=21, fabric-api *
+- `handleTakeItemEntity` is hooked at `RETURN`, not `HEAD` — the method hops threads at its start, so `HEAD` would fire twice.
+- An item entity's stack is only filled in by a later `SetEntityData` packet, which is why linking happens on the client tick instead of at entity spawn.
+- Block drops carry a 10-tick pickup delay, so the link is always ready before you can collect them.
 
-## 5. Asset Pipeline
+## Limitations
 
-`extract_gif.py` (gitignored helper) reads `~/Desktop/specialist.gif` and writes individual RGBA frames to `~/Desktop/specialist_frames/` as `frame_000.png`, `frame_001.png`, etc. Those frames are then copied into the mod's asset directory. The animation currently contains 147 frames.
+- The ore list is hardcoded in `SpecialistDanceClient.expectedDrop()` — adding ores means a code change.
+- Drops knocked more than 4 blocks from the ore, or collected more than 30 s later, won't link.
+- The frame count is fixed at 147 (`FRAME_COUNT`), so extra frames need a code change too.
+- Association state intentionally doesn't survive a world or dimension change.
 
-## 6. Development Progress
+## Contributing
 
-### Task Status
+Bug reports, tests and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for setup, coding and testing guidelines. Release history lives in [CHANGELOG.md](CHANGELOG.md).
 
-- Install and configure Java 21 — Completed
-- Download Gradle 9.2.1 / generate wrapper — Completed
-- Configure Loom — Completed
-- Organize source and resource directories — Completed
-- Correct the Fabric initializer import / package declaration — Completed
-- Compile the project (clean build) — Completed
-- Diagnose client crash (ClassNotFoundException) — Completed (fixed)
-- Detecting diamonds — Completed
-- Rendering a dancing animation — Completed
-- In-game verification on a real dev client — Pending
-- Additional trigger items (gold, emeralds, iron, netherite, etc.) — Completed
-- In-game config (duration/size/position/cooldown) — Not implemented
-- Character/config options — Not implemented
+## License
 
-## 7. Known Issues / Notes
-
-- The animation triggers on a tracked-item count increase; dropping and re-picking up a tracked item will re-trigger it.
-- The tracked item set is hardcoded in the `TRACKED_ITEMS` list and the inventory is read every tick.
-
-## 8. Immediate Next Steps
-
-1. Run `./gradlew clean build` and confirm `BUILD SUCCESSFUL`.
-2. Run `./gradlew runClient`, confirm the client reaches the main menu, and verify `run/logs/latest.log` contains `Specialist Dance is Ready!`.
-3. Test in-game: obtain a tracked item and confirm the dance animation plays centered on screen.
-4. Make the tracked item set user-configurable instead of the hardcoded `TRACKED_ITEMS` list.
-5. Add animation controls (duration, size, position, cooldown) and a config file.
-6. Add optional sound and additional characters/animations.
-
-## 9. Learning Approach
-
-Build manually as a learning exercise, work in small testable steps, and verify each feature in the dev client before moving on.
-
-## 10. Overall Status
-
-The mod now detects multiple valuable items (diamond, emerald, gold, iron, netherite — ingots and blocks) and plays a 147-frame dance animation HUD overlay. It compiles into a jar (`build/libs/specialist-dance-1.1.0.jar`). Remaining work is in-game verification plus making the trigger set configurable and adding config options.
+MIT — see [LICENSE](LICENSE).
