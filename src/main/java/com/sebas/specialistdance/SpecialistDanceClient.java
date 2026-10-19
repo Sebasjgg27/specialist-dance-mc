@@ -7,11 +7,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import com.sebas.specialistdance.audio.MusicManager;
+
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientEntityEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.event.client.player.ClientPlayerBlockBreakEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -38,6 +41,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
     );
 
     private SpecialistDanceConfig config;
+    private MusicManager musicManager;
     private long lastTriggerMillis = -1;
 
     private record PendingOre(Item expectedItem, long createdAtMillis) {}
@@ -72,6 +76,10 @@ public class SpecialistDanceClient implements ClientModInitializer {
             System.out.println("Specialist Dance: disabled via config");
             return;
         }
+
+        musicManager = new MusicManager(config);
+        musicManager.init();
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> musicManager.shutdown());
 
         ClientPlayerBlockBreakEvents.AFTER.register(
             (world, player, pos, state) -> {
@@ -318,5 +326,6 @@ public class SpecialistDanceClient implements ClientModInitializer {
 
         lastTriggerMillis = now;
         animationStartMillis = now;
+        musicManager.play();
     }
 }

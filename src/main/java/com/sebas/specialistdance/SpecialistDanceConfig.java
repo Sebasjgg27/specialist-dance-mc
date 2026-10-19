@@ -29,6 +29,10 @@ public class SpecialistDanceConfig {
     public int positionY = -1;
     public int cooldownMs = 0;
 
+    public boolean musicEnabled = true;
+    public float musicVolume = 1.0f;
+    public String musicTrack = "default";
+
     public static SpecialistDanceConfig load() {
         if (Files.exists(PATH)) {
             try (Reader reader = Files.newBufferedReader(PATH)) {
