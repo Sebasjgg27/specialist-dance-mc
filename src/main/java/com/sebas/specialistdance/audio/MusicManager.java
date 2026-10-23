@@ -88,7 +88,9 @@ public class MusicManager {
                     throw new IllegalStateException("OpenAL error " + error + " creating source");
                 }
             } finally {
-                ALC10.alcMakeContextCurrent(previous);
+                if (previous != 0L) {
+                    ALC10.alcMakeContextCurrent(previous);
+                }
             }
 
             available = true;
@@ -122,19 +124,15 @@ public class MusicManager {
     private void restoreContext(long previous) {
         if (switchedThreadContext) {
             EXTThreadLocalContext.alcSetThreadContext(previous);
-        } else {
+        } else if (previous != 0L) {
             ALC10.alcMakeContextCurrent(previous);
         }
     }
 
     private void releaseContext() {
         if (context != 0L) {
-            if (threadLocalContext) {
+            if (threadLocalContext && EXTThreadLocalContext.alcGetThreadContext() == context) {
                 EXTThreadLocalContext.alcSetThreadContext(0L);
-            }
-
-            if (ALC10.alcGetCurrentContext() == context) {
-                ALC10.alcMakeContextCurrent(0L);
             }
 
             ALC10.alcDestroyContext(context);
@@ -290,7 +288,8 @@ public class MusicManager {
         try {
             STBVorbis.stb_vorbis_get_info(decoder, info);
 
-            int channels = info.channels();
+            int sourceChannels = info.channels();
+            int channels = Math.min(sourceChannels, 2);
             int sampleRate = info.sample_rate();
             int samples = STBVorbis.stb_vorbis_stream_length_in_samples(decoder);
 
