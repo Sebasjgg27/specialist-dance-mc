@@ -18,7 +18,9 @@ The trigger is origin-aware on purpose: digging up a diamond ore and grabbing th
 - **Tracked ores** — the six valuable ones below, deepslate variants included.
 - **No false positives** — chests, mobs, trades and old ground loot are ignored.
 - **No double triggers** — a Fortune vein can drop several items but only dances once.
-- **Configurable** — timings, radius, animation size/position/speed and an on/off switch live in a JSON file.
+- **Dance music** — plays a bundled track while the animation is on screen.
+- **Custom music** — add your own Ogg Vorbis files and pick one in the settings screen.
+- **Configurable** — timings, radius, animation size/position/speed, music and an on/off switch.
 - **Zero noise** — debug logging is off by default.
 
 ## Tracked ores
@@ -37,7 +39,7 @@ Anything else — including copper, lapis, redstone and coal — is ignored.
 ## Installation
 
 1. Install [Fabric Loader](https://fabricmc.net/use/installer/) for 1.21.11 and **Fabric API**.
-2. Drop `specialist-dance-1.2.0.jar` into your `mods/` folder.
+2. Drop `specialist-dance-1.3.0.jar` into your `mods/` folder.
 3. Launch the game — you should see `Specialist Dance is Ready!` in the log.
 
 The mod does not need to be installed on the server.
@@ -54,7 +56,7 @@ Missing keys fall back to defaults and are added back to the file automatically.
 | Setting | Default | What it does |
 |---|---|---|
 | `enabled` | `true` | Turn the whole mod on or off. |
-| `debug` | `false` | Log the detection pipeline to the console. |
+| `debug` | `false` | Log the detection and music pipeline to the console. |
 | `oreTimeoutMs` | `10000` | How long a broken ore can still claim a drop. |
 | `linkTimeoutMs` | `30000` | How long a linked drop can still trigger a dance. |
 | `searchRadiusSquared` | `16.0` | Max distance (squared blocks) from drop to ore — `16` = 4 blocks. |
@@ -64,6 +66,9 @@ Missing keys fall back to defaults and are added back to the file automatically.
 | `positionX` | `-1` | X position; `-1` centres it horizontally. |
 | `positionY` | `-1` | Y position; `-1` centres it vertically. |
 | `cooldownMs` | `0` | Minimum gap between dances; `0` = none. |
+| `musicEnabled` | `true` | Play music while the dance animation is active. |
+| `musicVolume` | `1.0` | Music volume from `0.0` to `1.0`. |
+| `musicTrack` | `"default"` | Track name: `default` or a custom `.ogg` filename without the extension. |
 
 **Tip:** set `"debug": true` to watch the pipeline — it prints three lines per ore:
 
@@ -71,11 +76,30 @@ Missing keys fall back to defaults and are added back to the file automatically.
 registered ore -> linked drop -> activated for ore
 ```
 
+## Music
+
+Music starts when a dance triggers and stops when the animation ends.
+
+- `default` is the bundled track.
+- To add your own music, put `.ogg` files in:
+
+  ```
+  .minecraft/config/specialist-dance/music/
+  ```
+
+- The filename becomes the track name, without `.ogg`. For example, `victory.ogg` becomes `victory`.
+- `default` is reserved for the bundled track.
+- Press **K** in-game with no other screen open to change the track, volume or music setting.
+- The settings screen also has **Play preview** and **Stop** buttons.
+
+Only Ogg Vorbis is supported right now. Ogg Opus, MP3, WAV, FLAC and ALAC files are not loaded yet. Files added while the game is running are not picked up until the next launch.
+
 ## How it works
 
 1. **Break** — breaking a tracked ore records its position and expected drop for a few seconds.
 2. **Link** — the item entity spawns empty (the server sends its contents in a later packet), so the mod waits a tick, reads the item, and links it back to the nearby broken ore.
-3. **Pickup** — a Mixin notices when *you* collect that entity; if it's linked, the dance starts. Each ore position can only trigger once.
+3. **Pickup** — a Mixin notices when *you* collect that entity; if it's linked, the dance starts.
+4. **Music** — if music is enabled, the selected track starts with the animation and stops when it ends.
 
 State is cleared when you change world or dimension, and entries expire on their own.
 
@@ -85,12 +109,14 @@ Run in **Survival** — Creative mining drops nothing.
 
 | Scenario | Expected |
 |---|---|
-| Mine and collect a tracked ore | Three log lines (with `debug`) + dance |
+| Mine and collect a tracked ore | Three log lines (with `debug`) + dance + music |
 | Break dirt or stone | Nothing |
 | Open a chest / trade / grab old ground loot | Nothing |
 | Mine with Fortune | Several `linked drop`, one `activated` |
 | Re-mine the same spot | Triggers again |
-| Switch world or dimension | No stale trigger |
+| Switch world or dimension | No stale trigger and music stops |
+| Open settings with K | Music controls and track list appear |
+| Preview a custom track | That track plays until stopped |
 
 ## Troubleshooting
 
@@ -101,6 +127,16 @@ Run in **Survival** — Creative mining drops nothing.
 3. The drop landed more than 4 blocks from the ore, or you picked it up more than 30 s later.
 4. `"enabled"` is `false` in the config.
 5. `"debug"` is `false`, so the pipeline prints nothing — turn it on and watch for `registered` → `linked` → `activated`.
+
+**The dance plays but there is no music.**
+
+1. Check that `"musicEnabled"` is `true`.
+2. Check that `"musicVolume"` is above `0`.
+3. If you use a custom track, make sure the file is in the music folder, uses `.ogg`, and contains Ogg Vorbis audio.
+4. Restart the game after adding or renaming music files.
+5. Open the settings screen and try **Play preview**. If the custom track fails, the mod falls back to `default`.
+
+**The music keeps playing after the dance.** Press **Stop** in the settings screen, or check that the animation is actually finishing.
 
 ## Building & running
 
@@ -118,14 +154,18 @@ The first build needs network access to Fabric's Maven and Mojang's version mani
 
 - `SpecialistDanceClient.java` — entry point, detection pipeline, tick cleanup and HUD animation.
 - `SpecialistDanceConfig.java` — the JSON config model.
+- `audio/MusicManager.java` — music scanning, decoding, playback and lifecycle.
+- `config/menu/SpecialistDanceConfigScreen.java` — music and mod settings screen.
 - `mixin/ClientPacketListenerMixin.java` — reports pickups of the local player.
-- `assets/specialist-dance/` — icon plus the 147 animation frames.
+- `assets/specialist-dance/` — icon, bundled music and the 147 animation frames.
 
 ## Technical notes
 
 - `handleTakeItemEntity` is hooked at `RETURN`, not `HEAD` — the method hops threads at its start, so `HEAD` would fire twice.
 - An item entity's stack is only filled in by a later `SetEntityData` packet, which is why linking happens on the client tick instead of at entity spawn.
 - Block drops carry a 10-tick pickup delay, so the link is always ready before you can collect them.
+- Music uses Minecraft's existing OpenAL context. The mod does not open a second audio device or replace Minecraft's context.
+- The music source is created lazily on first playback and released on shutdown.
 
 ## Limitations
 
@@ -133,6 +173,9 @@ The first build needs network access to Fabric's Maven and Mojang's version mani
 - Drops knocked more than 4 blocks from the ore, or collected more than 30 s later, won't link.
 - The frame count is fixed at 147 (`FRAME_COUNT`), so extra frames need a code change too.
 - Association state intentionally doesn't survive a world or dimension change.
+- Custom music currently supports only `.ogg` files in the top level of the music folder.
+- Custom track names come from filenames; metadata tags and subdirectories are not used.
+- The music folder is scanned at startup, so restart the game after adding files.
 
 ## Contributing
 

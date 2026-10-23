@@ -3,7 +3,7 @@
 > Living document. Update this file whenever a phase ships.
 > Status legend: ✅ shipped · 🚧 in progress · ⬜ planned
 
-**Current version:** 1.2.0 · **Next target:** 1.3.0 (Sound On)
+**Current version:** 1.3.0 · **Next target:** 1.4.0 (Dance Floor)
 
 ---
 
@@ -78,18 +78,18 @@ Specialist Dance is a client-side Fabric mod (Minecraft 1.21.11, Java 21) that p
 
 **Completion criteria:** valid mining pickups always trigger exactly one dance; nothing else does.
 
-## Phase 4 — v1.3.0: Sound On ⬜
+## Phase 4 — v1.3.0: Sound On ✅
 
 **Goal:** Music playback synchronized with the dance. **Release: v1.3.0**
 
-- [ ] Package at least one default track at `assets/specialist-dance/sounds/*.ogg`.
-- [ ] Create `com.sebas.specialistdance.audio.MusicManager`; register/play music when a dance starts (`triggerDance()`).
-- [ ] Load user tracks from `config/specialist-dance/music/*.ogg` at startup and expose them as selectable options.
-- [ ] Stop/cleanup playback when the animation ends or the mod is disabled.
-- [ ] Config fields: `musicEnabled`, `musicVolume`, `musicTrack` (name of bundled or user track).
-- [ ] Prevent overlapping tracks and duplicate playback.
-- [ ] Handle interruption: world change, death, disconnect mid-dance.
-- [ ] Release: bump to 1.3.0, CHANGELOG entry, tag.
+- [x] Package at least one default track at `assets/specialist-dance/sounds/*.ogg`.
+- [x] Create `com.sebas.specialistdance.audio.MusicManager`; register/play music when a dance starts (`triggerDance()`).
+- [x] Load user tracks from `config/specialist-dance/music/*.ogg` at startup and expose them as selectable options.
+- [x] Stop/cleanup playback when the animation ends or the mod is disabled.
+- [x] Config fields: `musicEnabled`, `musicVolume`, `musicTrack` (name of bundled or user track).
+- [x] Prevent overlapping tracks and duplicate playback.
+- [x] Handle interruption: world change, death, disconnect mid-dance.
+- [x] Release: bump to 1.3.0, CHANGELOG entry, tag.
 
 ## Phase 5 — v1.4.0: Dance Floor (polish) ⬜
 
