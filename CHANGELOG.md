@@ -7,10 +7,10 @@
 - Added: custom music support from `.minecraft/config/specialist-dance/music/`. Filenames become track names and `default` is reserved for the bundled track.
 - Added: `musicEnabled`, `musicVolume` and `musicTrack` config fields.
 - Added: fallback to the bundled `default` track when the selected custom track is missing or cannot be loaded.
-- Changed: music playback uses Minecraft's existing OpenAL context instead of creating a second audio device and context.
-- Changed: the music source and buffer are created lazily and released with guarded shutdown code.
+- Changed: music restores the previous OpenAL context after playback and shutdown instead of clearing it.
+- Changed: buffer loading and shutdown now guard OpenAL context and object IDs.
+- Fixed: shutdown no longer clears Minecraft's active OpenAL context.
 - Fixed: tracks with more than two channels are downmixed to stereo for playback.
-- Fixed: music resources are not created while music is disabled.
 - Known: custom music supports Ogg Vorbis only; Ogg Opus, MP3, WAV, FLAC and ALAC are not supported yet.
 
 ## 1.2.0

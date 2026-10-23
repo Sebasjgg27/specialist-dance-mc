@@ -164,8 +164,8 @@ The first build needs network access to Fabric's Maven and Mojang's version mani
 - `handleTakeItemEntity` is hooked at `RETURN`, not `HEAD` — the method hops threads at its start, so `HEAD` would fire twice.
 - An item entity's stack is only filled in by a later `SetEntityData` packet, which is why linking happens on the client tick instead of at entity spawn.
 - Block drops carry a 10-tick pickup delay, so the link is always ready before you can collect them.
-- Music uses Minecraft's existing OpenAL context. The mod does not open a second audio device or replace Minecraft's context.
-- The music source is created lazily on first playback and released on shutdown.
+- Music uses its own OpenAL context and restores the previous context after playback and shutdown operations. It prefers `ALC_EXT_thread_local_context` so Minecraft's context is not left cleared.
+- The music source is created during init, the buffer is loaded on demand, and both are released on shutdown.
 
 ## Limitations
 
