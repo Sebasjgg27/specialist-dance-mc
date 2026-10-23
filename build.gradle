@@ -6,6 +6,14 @@ plugins {
 version = project.mod_version
 group = project.maven_group
 
+loom {
+    // Offline fallback: when the Mojang endpoints are unreachable, point Loom at a
+    // local mirror of the cached version metadata (e.g. -PloomCustomMetadataUrl=http://127.0.0.1:8765/1.21.11.json)
+    if (project.hasProperty("loomCustomMetadataUrl")) {
+        customMinecraftMetadata = project.property("loomCustomMetadataUrl")
+    }
+}
+
 base {
     archivesName.set(project.archives_base_name)
 }

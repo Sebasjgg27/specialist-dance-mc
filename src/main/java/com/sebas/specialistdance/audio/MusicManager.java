@@ -14,9 +14,14 @@ import java.util.TreeMap;
 import java.util.stream.Stream;
 
 import org.lwjgl.BufferUtils;
+import org.lwjgl.openal.AL;
 import org.lwjgl.openal.AL10;
+import org.lwjgl.openal.ALC;
 import org.lwjgl.openal.ALC10;
+import org.lwjgl.openal.ALCCapabilities;
+import org.lwjgl.openal.EXTThreadLocalContext;
 import org.lwjgl.stb.STBVorbis;
+import org.lwjgl.stb.STBVorbisInfo;
 import org.lwjgl.system.MemoryUtil;
 
 import com.sebas.specialistdance.SpecialistDanceConfig;
@@ -32,6 +37,8 @@ public class MusicManager {
     private final Map<String, Path> userTracks = new TreeMap<>();
 
     private boolean available;
+    private boolean threadLocalContext;
+    private boolean switchedThreadContext;
     private long device;
     private long context;
     private int sourceId = -1;
@@ -46,7 +53,12 @@ public class MusicManager {
         scanUserTracks();
 
         try {
-            device = ALC10.alcOpenDevice((ByteBuffer) null);
+            try {
+                device = ALC10.alcOpenDevice((ByteBuffer) null);
+            } catch (IllegalStateException notInitialized) {
+                ALC.create();
+                device = ALC10.alcOpenDevice((ByteBuffer) null);
+            }
 
             if (device == 0L) {
                 log("no audio device found, music disabled");
@@ -60,14 +72,81 @@ public class MusicManager {
                 log("could not create audio context, music disabled");
                 return;
             }
+
+            long previous = ALC10.alcGetCurrentContext();
             ALC10.alcMakeContextCurrent(context);
-            sourceId = AL10.alGenSources();
-            ALC10.alcMakeContextCurrent(0L);
+
+            try {
+                ALCCapabilities alcCapabilities = ALC.createCapabilities(device);
+                AL.createCapabilities(alcCapabilities);
+                threadLocalContext = alcCapabilities.ALC_EXT_thread_local_context;
+
+                sourceId = AL10.alGenSources();
+                int error = AL10.alGetError();
+
+                if (error != AL10.AL_NO_ERROR) {
+                    throw new IllegalStateException("OpenAL error " + error + " creating source");
+                }
+            } finally {
+                ALC10.alcMakeContextCurrent(previous);
+            }
+
             available = true;
         } catch (Exception e) {
             System.err.println("Specialist Dance: music init failed");
             e.printStackTrace();
+            releaseContext();
         }
+    }
+
+    private long makeContextCurrent() {
+        switchedThreadContext = false;
+
+        if (threadLocalContext) {
+            try {
+                long previous = EXTThreadLocalContext.alcGetThreadContext();
+                EXTThreadLocalContext.alcSetThreadContext(context);
+                switchedThreadContext = true;
+                return previous;
+            } catch (Throwable t) {
+                threadLocalContext = false;
+                log("thread-local audio context unavailable, sharing the process context");
+            }
+        }
+
+        long previous = ALC10.alcGetCurrentContext();
+        ALC10.alcMakeContextCurrent(context);
+        return previous;
+    }
+
+    private void restoreContext(long previous) {
+        if (switchedThreadContext) {
+            EXTThreadLocalContext.alcSetThreadContext(previous);
+        } else {
+            ALC10.alcMakeContextCurrent(previous);
+        }
+    }
+
+    private void releaseContext() {
+        if (context != 0L) {
+            if (threadLocalContext) {
+                EXTThreadLocalContext.alcSetThreadContext(0L);
+            }
+
+            if (ALC10.alcGetCurrentContext() == context) {
+                ALC10.alcMakeContextCurrent(0L);
+            }
+
+            ALC10.alcDestroyContext(context);
+            context = 0L;
+        }
+
+        if (device != 0L) {
+            ALC10.alcCloseDevice(device);
+            device = 0L;
+        }
+
+        sourceId = -1;
     }
 
     public List<String> getAvailableTracks() {
@@ -105,7 +184,7 @@ public class MusicManager {
     }
 
     public void play() {
-        if (!config.musicEnabled || !available) {
+        if (!available) {
             return;
         }
 
@@ -117,7 +196,7 @@ public class MusicManager {
             }
         }
 
-        ALC10.alcMakeContextCurrent(context);
+        long previous = makeContextCurrent();
 
         try {
             AL10.alSourceStop(sourceId);
@@ -126,10 +205,24 @@ public class MusicManager {
             AL10.alSourcef(sourceId, AL10.AL_GAIN, Math.clamp(config.musicVolume, 0.0f, 1.0f));
             AL10.alSourcePlay(sourceId);
         } finally {
-            ALC10.alcMakeContextCurrent(0L);
+            restoreContext(previous);
         }
 
         log("playing track: " + decodedTrack);
+    }
+
+    public void applyVolume() {
+        if (!available) {
+            return;
+        }
+
+        long previous = makeContextCurrent();
+
+        try {
+            AL10.alSourcef(sourceId, AL10.AL_GAIN, Math.clamp(config.musicVolume, 0.0f, 1.0f));
+        } finally {
+            restoreContext(previous);
+        }
     }
 
     public void stop() {
@@ -137,12 +230,12 @@ public class MusicManager {
             return;
         }
 
-        ALC10.alcMakeContextCurrent(context);
+        long previous = makeContextCurrent();
 
         try {
             AL10.alSourceStop(sourceId);
         } finally {
-            ALC10.alcMakeContextCurrent(0L);
+            restoreContext(previous);
         }
     }
 
@@ -151,7 +244,7 @@ public class MusicManager {
             return;
         }
 
-        ALC10.alcMakeContextCurrent(context);
+        long previous = makeContextCurrent();
 
         try {
             AL10.alSourceStop(sourceId);
@@ -159,12 +252,13 @@ public class MusicManager {
             AL10.alDeleteBuffers(bufferId);
             AL10.alDeleteSources(sourceId);
         } finally {
-            ALC10.alcMakeContextCurrent(0L);
+            restoreContext(previous);
         }
 
-        ALC10.alcDestroyContext(context);
-        ALC10.alcCloseDevice(device);
         available = false;
+        bufferId = -1;
+        decodedTrack = null;
+        releaseContext();
     }
 
     private boolean ensureTrackLoaded(String trackName) {
@@ -182,37 +276,66 @@ public class MusicManager {
             return false;
         }
 
-        IntBuffer channels = BufferUtils.createIntBuffer(1);
-        IntBuffer sampleRate = BufferUtils.createIntBuffer(1);
-        ShortBuffer pcm = STBVorbis.stb_vorbis_decode_memory(ogg, channels, sampleRate);
-        MemoryUtil.memFree(ogg);
+        IntBuffer errorBuffer = BufferUtils.createIntBuffer(1);
+        long decoder = STBVorbis.stb_vorbis_open_memory(ogg, errorBuffer, null);
 
-        if (pcm == null) {
-            log("failed to decode track: " + trackName);
+        if (decoder == MemoryUtil.NULL) {
+            MemoryUtil.memFree(ogg);
+            log("failed to open track: " + trackName + " (error " + errorBuffer.get(0) + ")");
             return false;
         }
 
-        ALC10.alcMakeContextCurrent(context);
+        STBVorbisInfo info = STBVorbisInfo.malloc();
 
         try {
-            if (bufferId >= 0) {
-                AL10.alSourcei(sourceId, AL10.AL_BUFFER, 0);
-                AL10.alDeleteBuffers(bufferId);
+            STBVorbis.stb_vorbis_get_info(decoder, info);
+
+            int channels = info.channels();
+            int sampleRate = info.sample_rate();
+            int samples = STBVorbis.stb_vorbis_stream_length_in_samples(decoder);
+
+            if (samples <= 0) {
+                log("track is empty: " + trackName);
+                return false;
             }
 
-            bufferId = AL10.alGenBuffers();
-            int format = channels.get(0) == 1
-                ? AL10.AL_FORMAT_MONO16
-                : AL10.AL_FORMAT_STEREO16;
-            AL10.alBufferData(bufferId, format, pcm, sampleRate.get(0));
-        } finally {
-            ALC10.alcMakeContextCurrent(0L);
-        }
+            ShortBuffer pcm = MemoryUtil.memAllocShort(samples * channels);
+            int frames = STBVorbis.stb_vorbis_get_samples_short_interleaved(decoder, channels, pcm);
 
-        MemoryUtil.memFree(pcm);
-        decodedTrack = trackName;
-        log("loaded track: " + trackName + " (" + sampleRate.get(0) + " Hz, " + channels.get(0) + " ch)");
-        return true;
+            if (frames <= 0) {
+                MemoryUtil.memFree(pcm);
+                log("failed to decode track: " + trackName);
+                return false;
+            }
+
+            pcm.limit(frames * channels);
+
+            long previous = makeContextCurrent();
+
+            try {
+                if (bufferId >= 0) {
+                    AL10.alSourcei(sourceId, AL10.AL_BUFFER, 0);
+                    AL10.alDeleteBuffers(bufferId);
+                }
+
+                bufferId = AL10.alGenBuffers();
+                int format = channels == 1
+                    ? AL10.AL_FORMAT_MONO16
+                    : AL10.AL_FORMAT_STEREO16;
+                AL10.alBufferData(bufferId, format, pcm, sampleRate);
+            } finally {
+                restoreContext(previous);
+            }
+
+            MemoryUtil.memFree(pcm);
+            decodedTrack = trackName;
+            log("loaded track: " + trackName + " (" + sampleRate + " Hz, " + channels + " ch)");
+            return true;
+        } finally {
+            info.free();
+            STBVorbis.stb_vorbis_close(decoder);
+            MemoryUtil.memFree(ogg);
+        }
     }
 
     private ByteBuffer readTrack(String trackName) {

@@ -8,14 +8,18 @@ import java.util.Map;
 import java.util.Set;
 
 import com.sebas.specialistdance.audio.MusicManager;
+import com.sebas.specialistdance.config.menu.SpecialistDanceConfigScreen;
 
+import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientEntityEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.event.client.player.ClientPlayerBlockBreakEvents;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -28,6 +32,8 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+
+import org.lwjgl.glfw.GLFW;
 
 public class SpecialistDanceClient implements ClientModInitializer {
 
@@ -42,6 +48,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
 
     private SpecialistDanceConfig config;
     private MusicManager musicManager;
+    private KeyMapping configKey;
     private long lastTriggerMillis = -1;
 
     private record PendingOre(Item expectedItem, long createdAtMillis) {}
@@ -79,6 +86,14 @@ public class SpecialistDanceClient implements ClientModInitializer {
 
         musicManager = new MusicManager(config);
         musicManager.init();
+
+        configKey = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+            "key.specialist-dance.config",
+            InputConstants.Type.KEYSYM,
+            GLFW.GLFW_KEY_K,
+            KeyMapping.Category.MISC
+        ));
+
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> musicManager.shutdown());
 
         ClientPlayerBlockBreakEvents.AFTER.register(
@@ -137,6 +152,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
 
                 if (frameIndex >= FRAME_COUNT) {
                     animationStartMillis = -1;
+                    musicManager.stop();
                     return;
                 }
 
@@ -182,7 +198,20 @@ public class SpecialistDanceClient implements ClientModInitializer {
             pendingDrops.clear();
             triggeredOres.clear();
             lastLevel = client.level;
+            musicManager.stop();
             return;
+        }
+
+        if (client.player != null && client.player.isDeadOrDying()) {
+            musicManager.stop();
+        }
+
+        while (configKey.consumeClick()) {
+            if (client.screen == null) {
+                client.setScreen(
+                    new SpecialistDanceConfigScreen(config, musicManager, client.screen)
+                );
+            }
         }
 
         long now = System.currentTimeMillis();
@@ -326,6 +355,9 @@ public class SpecialistDanceClient implements ClientModInitializer {
 
         lastTriggerMillis = now;
         animationStartMillis = now;
-        musicManager.play();
+
+        if (config.musicEnabled) {
+            musicManager.play();
+        }
     }
 }
