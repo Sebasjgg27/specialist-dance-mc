@@ -3,7 +3,7 @@
 > Living document. Update this file whenever a phase ships.
 > Status legend: ✅ shipped · 🚧 in progress · ⬜ planned
 
-**Current version:** 1.3.0 · **Next target:** 1.4.0 (Dance Floor)
+**Current version:** 1.3.1 · **Next target:** 1.4.0 (Dance Floor)
 
 ---
 
@@ -32,7 +32,7 @@ Specialist Dance is a client-side Fabric mod (Minecraft 1.21.11, Java 21) that p
 | Config model (existing) | `com.sebas.specialistdance.SpecialistDanceConfig` → move to `com.sebas.specialistdance.config.SpecialistDanceConfig` | v1.5.0 (repackage) |
 | Config menu (in-game screen) | `com.sebas.specialistdance.config.menu.SpecialistDanceConfigScreen`, opened via **ModMenu** entrypoint (`com.sebas.specialistdance.config.menu.ConfigMenuIntegration` registered in `fabric.mod.json`); built with a custom `Screen` (no cloth-config dependency) | v1.5.0 (ModMenu hook + placeholder) → v2.0.0 (full menu) |
 | Animation registry | `com.sebas.specialistdance.dance.DanceRegistry` | v1.7.0 |
-| **User music packs** | `.minecraft/config/specialist-dance/music/*.ogg` — any `.ogg` dropped here is scanned at startup and becomes selectable in config/menu | v1.3.0 |
+| **User music packs** | `.minecraft/config/specialist-dance/music/` — `.ogg` (Vorbis), `.wav`, `.aiff`, `.aif`, `.au`, `.mp3`, and `.flac` files are scanned at startup and become selectable in config/menu | v1.3.0 |
 | **User dance packs (GIF/frames)** | `.minecraft/config/specialist-dance/dances/<pack_name>/` — each folder is one dance: `frame_000.png … frame_NNN.png` (frame count auto-detected) plus optional `pack.json` (`{ "name", "fps" }`). Folders are scanned at startup; packs appear alongside bundled dances in the config/menu | v1.7.0 |
 
 > User packs are read-only to the mod (never rewritten). Invalid packs are skipped with a debug log warning. Bundled assets always remain available as defaults.
@@ -90,6 +90,17 @@ Specialist Dance is a client-side Fabric mod (Minecraft 1.21.11, Java 21) that p
 - [x] Prevent overlapping tracks and duplicate playback.
 - [x] Handle interruption: world change, death, disconnect mid-dance.
 - [x] Release: bump to 1.3.0, CHANGELOG entry, tag.
+
+## Phase 4b — v1.3.1: More Music Formats ✅
+
+**Goal:** Support common custom music formats through Java Sound decoders. **Release: v1.3.1**
+
+- [x] Bundle `javasound-mp3`, `javasound-flac`, `tritonus-share` via jar-in-jar (`include`).
+- [x] Scan user tracks for `.ogg`, `.wav`, `.aiff`, `.aif`, `.au`, `.mp3`, `.flac`.
+- [x] Decode non-OGG tracks with `javax.sound.sampled.AudioSystem` and upload to OpenAL.
+- [x] Keep OGG Vorbis decoding via STB unchanged.
+- [x] Update README/CHANGELOG/ROADMAP for format support (Ogg Opus and ALAC remain unsupported).
+- [x] Release: bump to 1.3.1, CHANGELOG entry, tag.
 
 ## Phase 5 — v1.4.0: Dance Floor (polish) ⬜
 

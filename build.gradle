@@ -14,6 +14,10 @@ loom {
     }
 }
 
+repositories {
+    mavenCentral()
+}
+
 base {
     archivesName.set(project.archives_base_name)
 }
@@ -24,6 +28,13 @@ dependencies {
 
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+    implementation "com.tianscar.javasound:javasound-mp3:1.9.8"
+    implementation "com.tianscar.javasound:javasound-flac:1.4.1"
+
+    include "com.tianscar.javasound:javasound-mp3:1.9.8"
+    include "com.tianscar.javasound:javasound-flac:1.4.1"
+    include "com.googlecode.soundlibs:tritonus-share:0.3.7.4"
 }
 
 processResources {

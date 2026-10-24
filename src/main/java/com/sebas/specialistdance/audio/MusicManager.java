@@ -1,8 +1,12 @@
 package com.sebas.specialistdance.audio;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
 import java.nio.file.Files;
@@ -10,8 +14,15 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.Locale;
 import java.util.TreeMap;
 import java.util.stream.Stream;
+
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.UnsupportedAudioFileException;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.openal.AL;
@@ -32,6 +43,8 @@ public class MusicManager {
 
     private static final String BUNDLED_NAME = "default";
     private static final String BUNDLED_RESOURCE = "/assets/specialist-dance/sounds/default.ogg";
+
+    private static final Set<String> SUPPORTED_EXTENSIONS = Set.of("ogg", "wav", "aiff", "aif", "au", "mp3", "flac");
 
     private final SpecialistDanceConfig config;
     private final Map<String, Path> userTracks = new TreeMap<>();
@@ -169,15 +182,25 @@ public class MusicManager {
         }
 
         try (Stream<Path> files = Files.list(musicDir)) {
-            files
-                .filter(p -> p.getFileName().toString().toLowerCase().endsWith(".ogg"))
-                .forEach(p -> {
-                    String name = p.getFileName().toString();
-                    name = name.substring(0, name.length() - ".ogg".length());
-                    userTracks.put(name, p);
-                });
+            files.filter(Files::isRegularFile).sorted().forEach(p -> {
+                String fileName = p.getFileName().toString();
+                int dot = fileName.lastIndexOf('.');
+                if (dot <= 0) {
+                    return;
+                }
+
+                String ext = fileName.substring(dot +1).toLowerCase(Locale.ROOT);
+                if (!SUPPORTED_EXTENSIONS.contains(ext)) {
+                    return;
+                }
+
+                String name = fileName.substring(0, dot);
+                if (userTracks.putIfAbsent(name, p) != null) {
+                    log("Duplicate track name ignored: " + fileName);
+                } 
+            });
         } catch (IOException e) {
-            log("could not scan music dir " + musicDir);
+            log("Could not scan music dir " + musicDir);
         }
     }
 
@@ -268,6 +291,34 @@ public class MusicManager {
             return true;
         }
 
+        String extension = extensionOf(trackName);
+        if (extension.isEmpty()) {
+            return false;
+        }
+
+        if ("ogg".equals(extension)) {
+            return loadOgg(trackName);
+        }
+
+        return loadWithJavaSound(trackName, extension);
+    }
+
+    private String extensionOf(String trackName) {
+        if (BUNDLED_NAME.equals(trackName)) {
+            return "ogg";
+        }
+
+        Path file = userTracks.get(trackName);
+        if (file == null) {
+            return "";
+        }
+
+        String name = file.getFileName().toString();
+        int dot = name.lastIndexOf('.');
+        return dot < 0 ? "" : name.substring(dot + 1).toLowerCase(Locale.ROOT);
+    }
+
+    private boolean loadOgg(String trackName) {
         ByteBuffer ogg = readTrack(trackName);
 
         if (ogg == null) {
@@ -308,23 +359,7 @@ public class MusicManager {
             }
 
             pcm.limit(frames * channels);
-
-            long previous = makeContextCurrent();
-
-            try {
-                if (bufferId >= 0) {
-                    AL10.alSourcei(sourceId, AL10.AL_BUFFER, 0);
-                    AL10.alDeleteBuffers(bufferId);
-                }
-
-                bufferId = AL10.alGenBuffers();
-                int format = channels == 1
-                    ? AL10.AL_FORMAT_MONO16
-                    : AL10.AL_FORMAT_STEREO16;
-                AL10.alBufferData(bufferId, format, pcm, sampleRate);
-            } finally {
-                restoreContext(previous);
-            }
+            uploadPcm(pcm, channels, sampleRate);
 
             MemoryUtil.memFree(pcm);
             decodedTrack = trackName;
@@ -337,38 +372,140 @@ public class MusicManager {
         }
     }
 
-    private ByteBuffer readTrack(String trackName) {
+    private void uploadPcm(ShortBuffer pcm, int channels, int sampleRate) {
+        long previous = makeContextCurrent();
+
         try {
-            if (trackName.equals(BUNDLED_NAME)) {
+            if (bufferId >= 0) {
+                AL10.alSourcei(sourceId, AL10.AL_BUFFER, 0);
+                AL10.alDeleteBuffers(bufferId);
+            }
+
+            bufferId = AL10.alGenBuffers();
+            int format = channels == 1
+                ? AL10.AL_FORMAT_MONO16
+                : AL10.AL_FORMAT_STEREO16;
+            AL10.alBufferData(bufferId, format, pcm, sampleRate);
+        } finally {
+            restoreContext(previous);
+        }
+    }
+
+    private boolean loadWithJavaSound(String trackName, String extension) {
+        byte[] fileBytes = readTrackBytes(trackName);
+        if (fileBytes == null) {
+            return false;
+        }
+
+        AudioInputStream source = null;
+        AudioInputStream pcmIn = null;
+        ShortBuffer pcm = null;
+
+        try {
+            source = AudioSystem.getAudioInputStream(new ByteArrayInputStream(fileBytes));
+            AudioFormat src = source.getFormat();
+
+            int srcChannels = src.getChannels();
+            int sampleRate = Math.round(src.getSampleRate());
+
+            AudioFormat target = new AudioFormat(
+                AudioFormat.Encoding.PCM_SIGNED,
+                src.getSampleRate(),
+                16,
+                srcChannels,
+                srcChannels * 2,
+                src.getSampleRate(),
+                false
+            );
+
+            pcmIn = AudioSystem.getAudioInputStream(target, source);
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] chunk = new byte[8192];
+            int read;
+            while ((read = pcmIn.read(chunk)) > 0) {
+                out.write(chunk, 0, read);
+            }
+
+            byte[] data = out.toByteArray();
+            int frames = data.length / (srcChannels * 2);
+            if (frames <= 0) {
+                log("Track is empty: " + trackName);
+                return false;
+            }
+
+            int outChannels = Math.min(srcChannels, 2);
+            ShortBuffer decoded = ByteBuffer.wrap(data)
+                .order(ByteOrder.LITTLE_ENDIAN)
+                .asShortBuffer();
+            decoded.limit(frames * srcChannels);
+
+            pcm = MemoryUtil.memAllocShort(frames * outChannels);
+
+            if (outChannels == srcChannels) {
+                pcm.put (decoded);
+            } else {
+                for (int frame = 0; frame < frames; frame++) {
+                    int base = frame * srcChannels;
+                    pcm.put(decoded.get(base));
+                    pcm.put(decoded.get(base + 1));
+                }
+            }
+
+            pcm.flip();
+            uploadPcm(pcm, outChannels, sampleRate);
+
+            decodedTrack = trackName;
+            log("loaded track: " + trackName + " (" + sampleRate + " Hz, " + outChannels + " ch, " + extension + ")");
+            return true;
+        } catch (UnsupportedAudioFileException e) {
+            log("unsupported audio format for " + trackName + " (" + extension + "): " + e.getMessage());
+            return false;
+        } catch (IOException | IllegalArgumentException e) {
+            log("failed to decode track: " + trackName + " (" + extension + "): " + e.getMessage());
+            return false;
+        } finally {
+            if (pcm != null) {
+                MemoryUtil.memFree(pcm);
+            }
+            closeQuietly(pcmIn);
+            closeQuietly(source);
+        }
+    }
+
+    private void closeQuietly(AudioInputStream stream) {
+        if (stream != null) {
+            try {
+                stream.close();
+            } catch (IOException ignored) {}
+        }
+    }
+
+    private ByteBuffer readTrack(String trackName) {
+        byte[] bytes = readTrackBytes(trackName);
+        if (bytes == null) {
+            return null;
+        }
+
+        ByteBuffer buffer = MemoryUtil.memAlloc(bytes.length);
+        buffer.put(bytes).flip();
+        return buffer;
+    }
+
+    private byte[] readTrackBytes(String trackName) {
+        try {
+            if (BUNDLED_NAME.equals(trackName)) {
                 try (InputStream in = MusicManager.class.getResourceAsStream(BUNDLED_RESOURCE)) {
-                    if (in == null) {
-                        log("bundled track missing: " + BUNDLED_RESOURCE);
-                        return null;
-                    }
-                    return readAll(in);
+                    return in == null ? null : in.readAllBytes();
                 }
             }
 
             Path file = userTracks.get(trackName);
-
-            if (file == null) {
-                return null;
-            }
-
-            try (InputStream in = Files.newInputStream(file)) {
-                return readAll(in);
-            }
+            return file == null ? null : Files.readAllBytes(file);
         } catch (IOException e) {
-            log("could not read track: " + trackName);
+            log("Could not read track: " + trackName);
             return null;
-        }
-    }
-
-    private ByteBuffer readAll(InputStream in) throws IOException {
-        byte[] bytes = in.readAllBytes();
-        ByteBuffer buffer = MemoryUtil.memAlloc(bytes.length);
-        buffer.put(bytes).flip();
-        return buffer;
+        } 
     }
 
     private void log(String message) {

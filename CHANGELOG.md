@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.1
+
+- Changed: custom music supports Ogg Vorbis, WAV, AIFF (`.aiff`/`.aif`), AU,
+  MP3 and FLAC files.
+- Known: Ogg Opus and ALAC are not supported.
+
 ## 1.3.0
 
 - Added: dance-triggered music with a bundled `default` Ogg Vorbis track.
