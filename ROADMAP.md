@@ -1,41 +1,74 @@
 # Specialist Dance — Development Roadmap
 
-> Living document. Update this file whenever a phase ships.
-> Status legend: ✅ shipped · 🚧 in progress · ⬜ planned
+> Living document. Update it whenever a phase changes state — not just at release.
+> If this file and the code disagree, the code wins and this file is wrong.
 
-**Current version:** 1.3.1 · **Next target:** 1.4.0 (Dance Floor)
+**Current release:** 1.3.1 (tagged) · **Pre-release:** `v1.4.0-rc1` · **Branch:** `v1.4.0`
+
+## What this project is
+
+A client-side Fabric mod (Minecraft 1.21.11, Java 21) that plays an on-screen dance when
+the player mines a valuable ore and picks up its drop. The long-term goal is a fully
+configurable celebration system: multiple dances, music, user-supplied content, and one
+in-game menu that reaches every setting.
+
+## Status legend
+
+| Mark | Meaning |
+|---|---|
+| ⬜ | planned — not started |
+| 🛠 | built — compiles, but nobody has seen it work |
+| 🧪 | verified — evidence recorded (log line, screenshot, repro) |
+| ✅ | released — version bumped, CHANGELOG entry, tagged in git |
+
+A release can be ✅ while individual checks inside it remain 🛠. Released means shipped,
+not proven. Anything still 🛠 at release time is **open debt** and must be listed in
+"Open debt" below, or it will be forgotten.
+
+Checkboxes say whether work exists; the marks say whether it has been proven. `[x]` with
+no mark means the verification is not the interesting question for that item.
 
 ---
 
-## Overview
+## Architecture rules (apply to every phase)
 
-Specialist Dance is a client-side Fabric mod (Minecraft 1.21.11, Java 21) that plays an on-screen dance animation when the player mines a valuable ore and picks up its drop. The long-term goal is a fully configurable celebration system: music, multiple dances, persistent settings, and an in-game config menu.
-
-**Architecture rules (apply to every phase):**
-
-1. **Every phase is one release.** When a phase's checklist is done and tested: bump `mod_version` in `gradle.properties`, add a `CHANGELOG.md` entry, tag the release in git, and mark the phase ✅ here.
-2. Keep detection, animation, audio, configuration, and UI in separate classes.
-3. Ship and test each feature before building dependent features on top of it.
-4. Diagnostic logging stays (`"debug": true` in config) until its system passes QA.
-5. Do not remove working fallback logic until its replacement is verified.
-6. Compile and test after meaningful changes.
+1. **Every phase is one release.** When its checklist is done and tested: bump
+   `mod_version` in `gradle.properties`, add a `CHANGELOG.md` entry, tag, mark ✅ here.
+2. **Nothing ships uncommitted.** A release starts by committing its own tree. If
+   unrelated work is sitting in the working tree, decide its fate before you bump the
+   version — do not let it ride along silently.
+3. **No orphan config.** A field lands in the same release as the code that reads it
+   *and* the menu control that edits it. A field with no consumer does not get merged.
+4. **Verification means a fresh run.** A cached `UP-TO-DATE` build, a successful
+   compile, or a clean boot log is not evidence. The artifact is a log line, a
+   screenshot, or a written repro that demonstrates the feature actually worked.
+5. **Every release closes at least one open QA box** from "Open debt". Small and
+   real beats a backlog nobody can clear.
+6. Keep detection, animation, audio, configuration, and UI in separate classes.
 7. Keep the mod client-side; no server dependency.
+8. Preserve working fallback logic until its replacement is verified.
 
 ---
 
-## Planned locations (where new systems will live)
+## Current reality (2026-10-25)
 
-| System | Location | Introduced in |
-|---|---|---|
-| Music assets (mod-bundled) | `src/main/resources/assets/specialist-dance/sounds/*.ogg` | v1.3.0 |
-| Music loader & playback | `com.sebas.specialistdance.audio.MusicManager` | v1.3.0 |
-| Config model (existing) | `com.sebas.specialistdance.SpecialistDanceConfig` → move to `com.sebas.specialistdance.config.SpecialistDanceConfig` | v1.5.0 (repackage) |
-| Config menu (in-game screen) | `com.sebas.specialistdance.config.menu.SpecialistDanceConfigScreen`, opened via **ModMenu** entrypoint (`com.sebas.specialistdance.config.menu.ConfigMenuIntegration` registered in `fabric.mod.json`); built with a custom `Screen` (no cloth-config dependency) | v1.5.0 (ModMenu hook + placeholder) → v2.0.0 (full menu) |
-| Animation registry | `com.sebas.specialistdance.dance.DanceRegistry` | v1.7.0 |
-| **User music packs** | `.minecraft/config/specialist-dance/music/` — `.ogg` (Vorbis), `.wav`, `.aiff`, `.aif`, `.au`, `.mp3`, and `.flac` files are scanned at startup and become selectable in config/menu | v1.3.0 |
-| **User dance packs (GIF/frames)** | `.minecraft/config/specialist-dance/dances/<pack_name>/` — each folder is one dance: `frame_000.png … frame_NNN.png` (frame count auto-detected) plus optional `pack.json` (`{ "name", "fps" }`). Folders are scanned at startup; packs appear alongside bundled dances in the config/menu | v1.7.0 |
+Tagged releases: `v1.0.0`, `v1.1.0`, `v1.2.0`, `v1.3.0`, `v1.3.1`.
 
-> User packs are read-only to the mod (never rewritten). Invalid packs are skipped with a debug log warning. Bundled assets always remain available as defaults.
+Pre-released in `v1.4.0-rc1`: the user-dance-pack feature — `dance/DanceRegistry`,
+`dance/DanceTextures`, `activeDance`, the dance selector in the config screen, and
+`tools/GifToFrames`. The GIF converter was fixed the same day it shipped (GIF frames
+are deltas, so the old export produced half-empty PNGs).
+
+| Claim | State |
+|---|---|
+| Ore → drop → dance trigger path | 🧪 diamond / deepslate diamond only (`run/logs/latest.log` 20:55:32) |
+| Bundled `specialist` dance renders | ✅ shipped since v1.0.0 |
+| A **user** pack renders in-game | 🛠 never observed — the only release blocker |
+| Config screen edits and persists | 🧪 `activeDance`, `musicTrack`, volume all written to disk |
+| Music formats (ogg/wav/mp3/flac…) | ✅ released in v1.3.1 |
+| `animationEndBehavior` | 🛠 **dead config** — declared, zero consumers |
+| Automated tests | ⬜ none; `test` is `NO-SOURCE` |
+| ModMenu entrypoint | ⬜ none |
 
 ---
 
@@ -48,155 +81,203 @@ Specialist Dance is a client-side Fabric mod (Minecraft 1.21.11, Java 21) that p
 
 ## Phase 2 — v1.1.0: The Dance Awakens ✅
 
-- [x] Expand tracking from diamonds to 6 valuable items (diamond, emerald, raw gold, raw iron, gold nugget, ancient debris).
-- [x] Refactor detection logic into a multi-item tracking foundation.
+- [x] Expand tracking to 6 valuable items (diamond, emerald, raw gold, raw iron, gold nugget, ancient debris).
+- [x] Refactor detection into a multi-item tracking foundation.
 - [x] Update README for multi-item behavior.
 
-## Phase 3 — v1.2.0: Better Detection ✅ (code-complete; QA checklist below)
+## Phase 3 — v1.2.0: Better Detection ✅ (released; QA incomplete → see Open debt)
 
 - [x] Detect ore block breaks via `ClientPlayerBlockBreakEvents.AFTER` (local player only).
 - [x] Ore → expected-drop mapping including deepslate and nether variants (`expectedDrop()`).
-- [x] Link dropped item entities to their source ore via proximity + expected-item matching (`findSourceOre()`).
+- [x] Link dropped item entities to their source ore via proximity + expected-item matching.
 - [x] Delay drop resolution to a later tick (spawn packet arrives before item data).
-- [x] Pickup detection via mixin on `ClientPacketListener.handleTakeItemEntity` at RETURN (local player only, matched by entity id).
+- [x] Pickup detection via mixin on `ClientPacketListener.handleTakeItemEntity` at RETURN.
 - [x] Deduplication: one dance per ore position (`triggeredOres`).
-- [x] Timeout/cleanup of pending ores, drop links, and pending drops; full state clear on world/dimension change.
-- [x] JSON config at `config/specialist-dance.json` (enabled, debug, timeouts, radius, animation size/position/duration, cooldown).
+- [x] Timeout/cleanup of pending state; full clear on world/dimension change.
+- [x] JSON config at `config/specialist-dance.json`.
 - [x] Diagnostic logging gated behind `"debug": true`.
-
-> **Note:** the `registered ore` log only prints with `"debug": true` in `config/specialist-dance.json` (default `false`). This is intentional, not a bug.
-
-### Phase 3 QA checklist (manual, with `"debug": true`)
-
-- [ ] Mine and pick up each tracked ore type (overworld, deepslate, nether gold ore, ancient debris).
-- [ ] Fortune enchantment: multiple drops from one ore → exactly **one** dance.
-- [ ] Rapidly mine two ores close together → no mis-association.
-- [ ] Old ground drops, chest loot, villager trades, mob drops → no trigger.
-- [ ] Drop knocked > 4 blocks away → no trigger (by design).
-- [ ] Re-mine the same spot later → triggers again.
-- [ ] Dimension change / disconnect → no stale triggers, no errors.
-
-**Completion criteria:** valid mining pickups always trigger exactly one dance; nothing else does.
 
 ## Phase 4 — v1.3.0: Sound On ✅
 
-**Goal:** Music playback synchronized with the dance. **Release: v1.3.0**
-
-- [x] Package at least one default track at `assets/specialist-dance/sounds/*.ogg`.
-- [x] Create `com.sebas.specialistdance.audio.MusicManager`; register/play music when a dance starts (`triggerDance()`).
-- [x] Load user tracks from `config/specialist-dance/music/*.ogg` at startup and expose them as selectable options.
-- [x] Stop/cleanup playback when the animation ends or the mod is disabled.
-- [x] Config fields: `musicEnabled`, `musicVolume`, `musicTrack` (name of bundled or user track).
+- [x] Bundle a default track at `assets/specialist-dance/sounds/*.ogg`.
+- [x] `audio/MusicManager`; play on `triggerDance()`.
+- [x] Load user tracks from `config/specialist-dance/music/` and expose them as options.
+- [x] Stop/cleanup on animation end, death, world change, disconnect.
+- [x] Config fields `musicEnabled`, `musicVolume`, `musicTrack`.
 - [x] Prevent overlapping tracks and duplicate playback.
-- [x] Handle interruption: world change, death, disconnect mid-dance.
-- [x] Release: bump to 1.3.0, CHANGELOG entry, tag.
+- [x] Release: 1.3.0 tagged.
 
 ## Phase 4b — v1.3.1: More Music Formats ✅
 
-**Goal:** Support common custom music formats through Java Sound decoders. **Release: v1.3.1**
-
-- [x] Bundle `javasound-mp3`, `javasound-flac`, `tritonus-share` via jar-in-jar (`include`).
-- [x] Scan user tracks for `.ogg`, `.wav`, `.aiff`, `.aif`, `.au`, `.mp3`, `.flac`.
-- [x] Decode non-OGG tracks with `javax.sound.sampled.AudioSystem` and upload to OpenAL.
+- [x] Bundle `javasound-mp3`, `javasound-flac`, `tritonus-share` via jar-in-jar.
+- [x] Scan `.ogg`, `.wav`, `.aiff`, `.aif`, `.au`, `.mp3`, `.flac`.
+- [x] Decode non-OGG with `javax.sound.sampled.AudioSystem`, upload to OpenAL.
 - [x] Keep OGG Vorbis decoding via STB unchanged.
-- [x] Update README/CHANGELOG/ROADMAP for format support (Ogg Opus and ALAC remain unsupported).
-- [x] Release: bump to 1.3.1, CHANGELOG entry, tag.
+- [x] Release: 1.3.1 tagged.
 
-## Phase 5 — v1.4.0: Dance Floor (polish) ⬜
+---
 
-**Goal:** Finish animation behavior options. *(Size, position, and duration already shipped in 1.2.0.)* **Release: v1.4.0**
+## Phase 5 — v1.4.0: Dance Packs 🛠
 
-- [ ] Config option for end-of-animation behavior: stop (default) / loop / hold last frame.
-- [ ] Cooldown verification and sensible repeated-trigger behavior (config `cooldownMs` exists; test and document).
-- [ ] Guard against overlapping dance restarts while an animation is playing.
-- [ ] Release: bump to 1.4.0, CHANGELOG entry, tag.
+**Goal:** users drop in their own animation and it plays. *(Was Phase 8; pulled
+forward because the work already exists in the tree and shipping it uncommitted
+violates rule 2.)*
 
-## Phase 6 — v1.5.0: Basic Controls ⬜
+**Status:** pre-released as `v1.4.0-rc1` on 2026-10-25 for in-game testing. Not ✅
+until the release blocker below is 🧪 and the version is re-tagged without the `-rc`
+suffix. The position/zoom editor is **not** in the rc — it was never typed.
 
-**Goal:** Harden the config system and open the door to the in-game menu. *(Persistence already ships in 1.2.0.)* **Release: v1.5.0**
+**Scope change from the old plan:** `pack.json` (`name`, `fps`) is **dropped**.
+`frameDurationMs` is already global; a per-pack fps would be a second source of
+truth nobody has asked for. Re-add only if a real pack needs it.
 
-- [ ] Validate config values (clamp sizes/timeouts, fall back to defaults on nonsense input).
-- [ ] Migrate/merge configs cleanly when new fields are added.
-- [ ] Repackage config classes under `com.sebas.specialistdance.config`.
-- [ ] Add **ModMenu** dependency and entrypoint: `com.sebas.specialistdance.config.menu.ConfigMenuIntegration` (declared in `fabric.mod.json`) opening a **placeholder** `SpecialistDanceConfigScreen` (shows current values read-only + "full menu in v2.0.0"). The real screen is built in v2.0.0 at `com.sebas.specialistdance.config.menu.SpecialistDanceConfigScreen`.
-- [ ] Keep JSON as the source of truth; the menu edits the same `config/specialist-dance.json`.
-- [ ] Release: bump to 1.5.0, CHANGELOG entry, tag.
+- [x] Remove hardcoded `FRAME_COUNT = 147`; derive frame count per pack by folder scan.
+- [x] `dance/DanceRegistry` — bundled `specialist` + user packs from `config/specialist-dance/dances/<pack>/`.
+- [x] `dance/DanceTextures` — load pack frames as `DynamicTexture`s, cache, release on pack change and shutdown.
+- [x] Config field `activeDance`, selectable in the config screen. 🛠 the screen saves on
+      close (observed for `musicTrack`), but no `activeDance` change has ever reached disk
+- [x] One shared playback/cleanup path for bundled and user dances.
+- [x] `tools/GifToFrames` — composite GIF frame deltas onto the logical screen canvas. 🧪 verified against `zelda.gif`: 29/29 frames uniform 256×210
+- [ ] **Position/zoom editor** — drag the dance anywhere, scroll to zoom, Center / Fit / Reset.
+      User packs have arbitrary dimensions, which is what makes the fixed
+      `drawSize` + centered placement inadequate; this is the old Phase 11 "Dance
+      Settings" item, moved here on purpose.
+- [ ] Re-check the bundled `specialist` dance visually. Its frames are 498×351; from v1.0.0
+      through v1.3.1 they were stretched into a square 160×160 box, and the aspect fix in
+      this release draws the same content at 160×113 — geometrically correct, but about 30%
+      less screen area than it has always occupied. Accept the new size or raise `drawSize`;
+      do not re-introduce the distortion.
+- [ ] **Release blocker:** a hand-made user pack observed rendering in Survival.
+- [ ] Update README + CHANGELOG, bump `mod_version` to 1.4.0, `./gradlew build`, tag.
 
-## Phase 7 — v1.6.0: Your Rules ⬜
+## Phase 6 — v1.5.0: Animation Control ⬜
 
-**Goal:** Make triggers configurable. **Release: v1.6.0**
+**Goal:** finish what the old Phase 5 promised. *(Was Phase 5; moved after the
+packs ship, because `loop` interacts with the editor's live preview.)*
 
-- [ ] Move the hardcoded ore → drop map from `expectedDrop()` into config (list of `block → item` pairs, with defaults matching current behavior).
+- [ ] `animationEndBehavior` consumers in the HUD branch. Four values:
+      `stop` — play the dance once and clear it (today's behavior, stays the default).
+      `hold` — play once, keep the last frame on screen.
+      `loop` — repeat the dance until something else ends it.
+      `loop-until-music-ends` — repeat while the track plays, clear when it finishes.
+- [ ] **Prerequisite:** `MusicManager` exposes only `init`, `getAvailableTracks`, `play`,
+      `applyVolume`, `stop` and `shutdown` — nothing reports whether the source is still
+      playing. `loop-until-music-ends` cannot exist until it gains `isPlaying()` (or a
+      decoded track duration to compare against `animationStartMillis`).
+- [ ] Define the no-music fallback: with `musicEnabled` false there is no end signal, so
+      `loop-until-music-ends` must degrade to `stop` or to `loop`. Pick one and document it.
+- [ ] Unknown or typo'd value falls back to `stop` without throwing.
+- [ ] Guard against overlapping restarts mid-animation — pick one: ignore, restart, or queue.
+      Note the conflict: under `loop` an animation never ends, so a naive guard blocks
+      every future dance. The guard must know whether the current animation is finite.
+- [ ] Verify `cooldownMs` (consumed today, never tested): check `lastTriggerMillis`
+      surviving a world change, and that the default `0` skips the check entirely.
+- [ ] Release: 1.5.0, CHANGELOG, tag.
+
+## Phase 7 — v1.6.0: Solid Ground ⬜
+
+**Goal:** make the config layer trustworthy. *(Was Phase 6.)*
+
+**Scope change:** the ModMenu **placeholder screen** is deleted from the plan. A real,
+editing `config.menu.SpecialistDanceConfigScreen` already ships and is opened by the
+**K** keybind; a read-only preview of it would be wasted work. ModMenu opens the
+screen that exists.
+
+- [ ] Validate and clamp every config value on load; fall back to defaults on nonsense.
+- [ ] Merge cleanly when new fields appear in an old file (no silent resets).
+- [ ] Repackage `SpecialistDanceConfig` into `com.sebas.specialistdance.config`.
+- [ ] Add ModMenu dependency + `ConfigMenuIntegration` opening the existing screen.
+- [ ] Keep JSON as the source of truth; menu and file never diverge.
+- [ ] Release: 1.6.0, CHANGELOG, tag.
+
+## Phase 8 — v1.7.0: Your Rules ⬜
+
+**Goal:** make triggers configurable. *(Was Phase 7.)*
+
+- [ ] Move the hardcoded ore → drop map from `expectedDrop()` into config, defaults matching today.
 - [ ] Enable/disable individual ores.
-- [ ] Keep trigger logic independent of animation and audio systems.
-- [ ] (Optional stretch) celebration statistics counter per ore type, stored in config.
-- [ ] Release: bump to 1.6.0, CHANGELOG entry, tag.
+- [ ] Keep trigger logic independent of animation and audio.
+- [ ] (Stretch) celebration counter per ore type, stored in config.
+- [ ] Release: 1.7.0, CHANGELOG, tag.
 
-## Phase 8 — v1.7.0: More Dances ⬜
+## Phase 9 — v1.8.0: Provable ⬜
 
-**Goal:** Multiple animations with a resource-management layer — including **user-supplied dance packs**. **Release: v1.7.0**
+**Goal:** stop hand-verifying logic that needs no game running. *(New — this existed
+in no earlier plan and is the highest-leverage gap in the project.)*
 
-- [ ] Remove hardcoded `FRAME_COUNT = 147`; derive frame count per dance pack (folder scan / `pack.json`).
-- [ ] Animation registry `com.sebas.specialistdance.dance.DanceRegistry`:
-  - Bundled dances from `assets/specialist-dance/textures/gui/dances/<name>/frame_%03d.png`.
-  - **User dances** from `config/specialist-dance/dances/<pack_name>/frame_%03d.png` (+ optional `pack.json` with `name` and `fps`) — users drop their own GIF-exported frame sequences here, no rebuild needed.
-- [ ] Config field `activeDance` to select the bundled or user dance.
-- [ ] All dances share the same playback/cleanup path.
-- [ ] Ship at least one additional bundled dance; verify a hand-made user pack loads.
-- [ ] Release: bump to 1.7.0, CHANGELOG entry, tag.
+- [ ] JUnit setup for Minecraft-free classes only; no Loom test harness, no mocks of `Minecraft`.
+- [ ] `DanceRegistry.countFrames` — empty dir, gap in sequence, non-contiguous, junk filenames, valid pack.
+- [ ] Placement math — aspect fit, oversized `drawSize`, negative/auto-centre positions.
+- [ ] GIF compositing — a delta frame with `doNotDispose` must produce a full canvas; disposal
+      `restoreToBackgroundColor` and `restoreToPrevious` must each behave. This is the
+      regression that shipped inside `tools/GifToFrames` until 2026-10-25.
+- [ ] Release: 1.8.0, CHANGELOG, tag.
 
-## Phase 9 — v1.8.0: Stability ⬜
+## Phase 10 — v1.9.0: Stability ⬜
 
-**Goal:** Reliability and performance pass. **Release: v1.8.0**
+**Goal:** reliability and performance pass. *(Was Phase 9.)*
 
 - [ ] Fix detection/playback edge cases found in the field.
 - [ ] Audit entity-tracking maps for leaks (entity removal, world change).
-- [ ] Review client event lifecycle for double-registrations.
-- [ ] Remove obsolete code; retire diagnostic logs whose systems have passed QA.
-- [ ] Extended-session performance check (memory, tick cost), including user-pack rescans.
-- [ ] Release: bump to 1.8.0, CHANGELOG entry, tag.
+- [ ] Review client event lifecycle for double-registration.
+- [ ] Retire diagnostic logs whose systems have passed QA.
+- [ ] Extended-session check (memory, tick cost), including user-pack texture caching.
+- [ ] Release: 1.9.0, CHANGELOG, tag.
 
-## Phase 10 — v1.9.0: Final Mix ⬜
+## Phase 11 — v2.0.0: Final Mix ⬜
 
-**Goal:** Full integration before the menu release. **Release: v1.9.0**
+**Goal:** full integration sweep before the menu is called complete. *(Was Phase 10.)*
 
-- [ ] Verify detection + animation + music + config all interact correctly.
-- [ ] Confirm audio/animation start/stop stay synchronized under all config combinations.
+- [ ] Detection + animation + music + config verified together under every config combination.
+- [ ] Audio/animation start-stop synchronisation re-checked after the end-behavior work.
 - [ ] Regression test the complete QA matrix.
-- [ ] Update README (including a "Your content" section explaining the `music/` and `dances/` folders), CHANGELOG, and release notes.
-- [ ] Release: bump to 1.9.0, CHANGELOG entry, tag.
+- [ ] README "Your content" section for `music/` and `dances/`.
+- [ ] Release: 2.0.0, CHANGELOG, tag.
 
-## Phase 11 — v2.0.0: The Control Room ⬜
+## Phase 12 — v2.1.0: The Control Room ⬜
 
-**Goal:** Replace the v1.5.0 placeholder with the full in-game configuration menu. **Release: v2.0.0**
+**Goal:** every feature configurable from one menu. *(Was Phase 11, re-targeted off
+v2.0.0: the music and dance sections of that menu already shipped, so the remaining
+work is not a major-version rewrite.)*
 
-**Where it lives:** `com.sebas.specialistdance.config.menu.SpecialistDanceConfigScreen` — a custom Fabric `Screen` (no cloth-config dependency), opened from ModMenu via `ConfigMenuIntegration` and from the in-game Mods screen. It edits the same `config/specialist-dance.json` (JSON remains the source of truth).
-
-Sections:
-
-- [ ] **Music** — enable/disable, volume, pick a bundled or user track from `config/specialist-dance/music/`, playback behavior on dance start/end.
-- [ ] **Dance Settings** — size, screen position, duration, end-of-animation behavior.
-- [ ] **Dances & Characters** — browse bundled + user packs from `config/specialist-dance/dances/`, select the active dance, preview, "open folder" button.
-- [ ] **Triggers** — which ores/conditions activate the dance; live-synced with the detection system.
+- [ ] **Music** — playback behavior on dance start/end. *(enable/volume/track: shipped v1.3.0)*
+- [ ] **Dance Settings** — duration and end-of-animation behavior. *(size/position: v1.4.0)*
+- [ ] **Dances & Characters** — "open folder" button; preview inside the screen.
+- [ ] **Triggers** — ore toggles, live-synced with detection.
 - [ ] **General** — save/restore, reset to defaults, mod version info.
-
-**Completion criteria:** every feature configurable through one menu; settings persist across sessions; no regressions in normal gameplay.
-**Release:** bump to 2.0.0, CHANGELOG entry, tag.
+- [ ] Keybind remapping for the **K** config key.
+- [ ] Release: 2.1.0, CHANGELOG, tag.
 
 ---
+
+## Open debt
+
+Anything 🛠 at release time lands here until it is 🧪.
+
+- [ ] **Phase 3 QA (v1.2.0), 6 of 7 never run** — mine each tracked ore type (only
+      diamond/deepslate diamond is proven); Fortune multi-drop → exactly one dance;
+      two ores mined rapidly side by side → no mis-association; chest/trade/mob/pre-existing
+      ground drops → no trigger; drop knocked > 4 blocks → no trigger; re-mine the same
+      spot later → triggers again; dimension change/disconnect → no stale triggers.
+- [ ] `animationEndBehavior` is dead config in a released version (breaks rule 3).
+- [ ] `DanceRegistry.countFrames` returns `-1` for empty, gapped and unreadable packs
+      alike, so the debug log cannot tell them apart.
+- [ ] The `putIfAbsent` duplicate-name branch in `DanceRegistry.scan` is unreachable.
 
 ## Out of scope / future ideas
 
 - Server-side sync (multiple players dancing together).
 - Localization (lang files).
-- Animated GIF files loaded directly (users export GIFs to PNG frame sequences; see v1.7.0 packs).
+- Loading animated GIF files directly — `NativeImage.read` calls `PngInfo.validateHeader`,
+  which demands the PNG magic before STB sees the bytes, so PNG is the only decodable
+  frame format. Users export GIFs to PNG sequences via `tools/GifToFrames`.
+- `pack.json` per-dance metadata (dropped from v1.4.0; see that phase).
 - Cloud/shared dance pack browser.
-
----
 
 ## Versioning & release rules
 
-- **Every phase produces exactly one release** (Phase N → vX.Y.Z). A phase is only marked ✅ after its release is tagged.
-- Version numbers follow the phase table above (`gradle.properties` → `mod_version`, `CHANGELOG.md` entry per release).
-- Every release: bump version, update CHANGELOG, tag in git, verify `./gradlew build` succeeds.
-- This file is committed to the repo — update the checkboxes as work lands so it always reflects reality.
+- One phase = one release = one tag. A phase is ✅ only after the tag exists.
+- Every release: bump `mod_version`, add a `CHANGELOG.md` entry, update README if
+  behavior changed, verify `./gradlew build` with a fresh run, then tag.
+- Reordering this file is allowed; releasing out of order is not. If reality beats
+  the plan, fix the plan the same day — that is what happened to the 2026-10-25 revision.

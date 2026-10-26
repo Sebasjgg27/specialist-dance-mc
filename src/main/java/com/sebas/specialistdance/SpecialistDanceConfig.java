@@ -33,6 +33,9 @@ public class SpecialistDanceConfig {
     public float musicVolume = 1.0f;
     public String musicTrack = "default";
 
+    public String animationEndBehavior = "stop";
+    public String activeDance = "specialist";
+
     public static SpecialistDanceConfig load() {
         if (Files.exists(PATH)) {
             try (Reader reader = Files.newBufferedReader(PATH)) {

@@ -1,8 +1,9 @@
 # Specialist Dance
 
 A **client-side** Fabric mod. When you mine a valuable ore and pick up its
-drop, a 147-frame dance animation plays in the middle of your screen — the
-"Specialist" dance meme from *Persona 4* and *The Binding of Isaac*.
+drop, a dance animation plays in the middle of your screen — by default the
+147-frame "Specialist" dance meme from *Persona 4* and *The Binding of Isaac*,
+or any animation you add as your own [dance pack](#custom-dances).
 
 The trigger is origin-aware on purpose: digging up a diamond ore and grabbing
 the diamond celebrates. Pulling a diamond out of a chest, trading with a
@@ -49,7 +50,7 @@ Anything else — including copper, lapis, redstone and coal — is ignored.
 
 1. Install [Fabric Loader](https://fabricmc.net/use/installer/) for 1.21.11
    and **Fabric API**.
-2. Drop `specialist-dance-1.3.1.jar` into your `mods/` folder.
+2. Drop `specialist-dance-1.4.0-rc1.jar` into your `mods/` folder.
 3. Launch the game — you should see `Specialist Dance is Ready!` in the log.
 
 The mod does not need to be installed on the server.
@@ -79,6 +80,7 @@ Missing keys fall back to defaults and are added back to the file automatically.
 | `musicEnabled` | `true` | Play music while the dance animation is active. |
 | `musicVolume` | `1.0` | Music volume from `0.0` to `1.0`. |
 | `musicTrack` | `"default"` | Track name: `default` or a custom filename without its extension. |
+| `activeDance` | `"specialist"` | Dance to play: `specialist` (bundled) or a folder name from the dances folder. |
 
 **Tip:** set `"debug": true` to watch the pipeline — it prints three lines
 per ore:
@@ -108,6 +110,38 @@ Music starts when a dance triggers and stops when the animation ends.
 
 Ogg Opus and ALAC are not supported. Files added while the game is running are
 not picked up until the next launch.
+
+## Custom dances
+
+The bundled animation is named `specialist`. To add your own, create a folder
+per dance:
+
+```text
+.minecraft/config/specialist-dance/dances/<name>/frame_000.png
+.minecraft/config/specialist-dance/dances/<name>/frame_001.png
+...
+```
+
+- The folder name becomes the dance name, selectable with **K** → **Dance pack**.
+- Frames must be numbered from `000` with no gaps; the count is detected
+  automatically. A pack with a hole in the sequence is skipped.
+- PNG is the only image format the mod can decode — `NativeImage.read` checks the
+  PNG header before handing the bytes to the texture loader, so `.gif`, `.jpg`
+  and `.webp` files cannot be used as frames directly.
+- A GIF usually stores only the pixels that change between frames, so the
+  converter rebuilds every frame on top of the previous one before writing it.
+  Check the result: a pack whose frames look torn or half-empty came from a
+  badly exported GIF, and some GIFs simply will not look good as a dance.
+- A GIF with its own background paints an opaque box over the game; only GIFs
+  with a real transparent background blend in.
+- GIFs are not loaded directly — export them to PNG frames first:
+
+  ```sh
+  java tools/GifToFrames.java mydance.gif ../config/specialist-dance/dances/mydance 256
+  ```
+
+- Like music, the dances folder is scanned at startup, so restart after adding
+  files.
 
 ## How it works
 
@@ -212,8 +246,9 @@ manifest.
   adding ores means a code change.
 - Drops knocked more than 4 blocks from the ore, or collected more than 30 s
   later, won't link.
-- The frame count is fixed at 147 (`FRAME_COUNT`), so extra frames need a code
-  change too.
+- The frame count is detected per dance pack, so adding frames only means
+  adding files — but every frame in a pack is drawn on its own canvas, so
+  mixed frame sizes will make the animation shift.
 - Association state intentionally doesn't survive a world or dimension change.
 - Custom music supports `.ogg` (Vorbis), `.wav`, `.aiff`, `.aif`, `.au`,
   `.mp3`, and `.flac` files in the top level of the music folder. Ogg Opus and
