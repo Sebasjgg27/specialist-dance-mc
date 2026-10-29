@@ -74,6 +74,10 @@ public class SpecialistDanceClient implements ClientModInitializer {
         return instance;
     }
 
+    public DanceTextures getDanceTextures() {
+        return danceTextures;
+    }
+
     @Override
     public void onInitializeClient() {
         instance = this;
@@ -156,12 +160,36 @@ public class SpecialistDanceClient implements ClientModInitializer {
                 long elapsed = System.currentTimeMillis() - animationStartMillis;
 
                 DanceRegistry.Dance dance = danceRegistry.find(config.activeDance);
-                int frameIndex = (int) (elapsed / Math.max(1, config.frameDurationMs));
 
-                if (frameIndex >= dance.frameCount()) {
+                if (dance.frameCount() <= 0) {
                     animationStartMillis = -1;
                     musicManager.stop();
                     return;
+                }
+                int frameIndex = (int) (elapsed / Math.max(1, config.frameDurationMs));
+
+                String behavior = config.animationEndBehavior;
+
+                if ("loop".equals(behavior)) {
+                    if (!musicManager.isPlaying()) {
+                        animationStartMillis = -1;
+                        return;
+                    }
+                    frameIndex = frameIndex % dance.frameCount();
+                } else if ("hold".equals(behavior)) {
+                    if (!musicManager.isPlaying()) {
+                        animationStartMillis = -1;
+                        return;
+                    }
+                    if (frameIndex >= dance.frameCount()) {
+                        frameIndex = dance.frameCount() - 1;
+                    }
+                } else {
+                    if (frameIndex >= dance.frameCount()) {
+                        animationStartMillis = -1;
+                        musicManager.stop();
+                        return;
+                    }
                 }
 
                 DanceTextures.Frame frame = danceTextures.get(
@@ -177,28 +205,27 @@ public class SpecialistDanceClient implements ClientModInitializer {
                     return;
                 }
 
-                int maxSize = Math.max(1, config.drawSize);
-                double scale = (double) maxSize / Math.max(frame.width(), frame.height());
-
-                int width = Math.max(1, (int) Math.round(frame.width() * scale));
-                int height = Math.max(1, (int) Math.round(frame.height() * scale));
-
-                int x = config.positionX >= 0
-                    ? config.positionX
-                    : (graphics.guiWidth() - width) / 2;
-                int y = config.positionY >= 0
-                    ? config.positionY
-                    : (graphics.guiHeight() - height) / 2;
+                DanceTextures.Placement placement = DanceTextures.place(
+                    frame,
+                    config.stageWidthPercent,
+                    config.stageHeightPercent,
+                    config.positionX,
+                    config.positionY,
+                    graphics.guiWidth(),
+                    graphics.guiHeight()
+                );
 
                 graphics.blit(
                     RenderPipelines.GUI_TEXTURED,
                     frame.texture(),
-                    x,
-                    y,
+                    placement.x(),
+                    placement.y(),
                     0.0f,
                     0.0f,
-                    width,
-                    height,
+                    placement.width(),
+                    placement.height(),
+                    frame.width(),
+                    frame.height(),
                     frame.width(),
                     frame.height()
                 );

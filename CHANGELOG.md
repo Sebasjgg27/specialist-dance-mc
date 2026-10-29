@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+Working-tree changes on top of `v1.4.0-rc1`. Not built into a release jar and not yet
+verified in-game — see `ROADMAP.md` Phase 5.
+
+- Added: **Position dance** screen — drag the animation anywhere, scroll to zoom, with
+  **Center**, **Fit** and **reset** buttons; the choice is saved on close.
+- Added: **Open music folder** and **Open dances folder** buttons in the **K** menu, so
+  custom content is one click away.
+- Added: **Rescan** button — picks up music files and dance packs added since launch,
+  without restarting the game.
+
 ## 1.4.0-rc1
 
 Pre-release for testing user dance packs. The pack render has not been observed
@@ -59,8 +71,12 @@ in-game yet — see `ROADMAP.md` Phase 5.
 
 ## 1.1.0
 
-- Multi-item tracking (diamond, emerald, gold, iron, netherite ingots/blocks) and README updates.
+- Changed: the diamond check became multi-item tracking — diamond, emerald, raw gold,
+  raw iron, gold nugget and ancient debris.
+- Added: first pickup hook, a Mixin on `ClientPacketListener.handleTakeItemEntity`.
+- Changed: README updated for multi-item behavior.
 
 ## 1.0.0
 
-- Initial release: diamond detection and a 147-frame Specialist Dance HUD overlay.
+- Initial release: diamond detection and the 147-frame Specialist Dance HUD overlay,
+  with the animation frames, icon and mod metadata packaged in the jar.

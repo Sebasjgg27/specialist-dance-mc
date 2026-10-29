@@ -29,6 +29,7 @@ villager, or walking over loot someone else dropped does **not**.
 - **Dance music** — plays a bundled track while the animation is on screen.
 - **Custom music** — add supported audio files and pick one in the settings
   screen.
+- **Custom dances** — drop a folder of PNG frames in and select it as your dance.
 - **Configurable** — timings, radius, animation size/position/speed, music and
   an on/off switch.
 - **Zero noise** — debug logging is off by default.
@@ -108,8 +109,8 @@ Music starts when a dance triggers and stops when the animation ends.
   music setting.
 - The settings screen also has **Play preview** and **Stop** buttons.
 
-Ogg Opus and ALAC are not supported. Files added while the game is running are
-not picked up until the next launch.
+Ogg Opus and ALAC are not supported. Files added while the game is running are picked
+up by **Rescan** (see below) or on the next launch.
 
 ## Custom dances
 
@@ -141,7 +142,19 @@ per dance:
   ```
 
 - Like music, the dances folder is scanned at startup, so restart after adding
-  files.
+  files. (The in-progress **Rescan** button covers music tracks only; dance packs
+  still need a restart.)
+
+## Settings screen
+
+Press **K** (with no other screen open) for: music on/off, volume, track selector,
+**Play preview** / **Stop**, the **Dance pack** selector, **Preview dance on close**
+and **Done**. Everything is written to `specialist-dance.json` when the screen closes.
+
+Not in the `1.4.0-rc1` jar yet — it is in the working tree, unverified: a **Position
+dance** editor (drag to move, scroll to zoom, **Center** / **Fit** / **reset**),
+**Open music folder** and **Open dances folder** shortcuts, and a **Rescan** button
+that picks up files added since launch without a restart.
 
 ## How it works
 
@@ -172,6 +185,7 @@ Run in **Survival** — Creative mining drops nothing.
 | Switch world or dimension | No stale trigger and music stops |
 | Open settings with K | Music controls and track list appear |
 | Preview a custom track | That track plays until stopped |
+| Select a custom dance pack | Not yet verified in-game — see `ROADMAP.md` Phase 5 |
 
 ## Troubleshooting
 
@@ -219,12 +233,16 @@ manifest.
 - `SpecialistDanceConfig.java` — the JSON config model.
 - `audio/MusicManager.java` — music scanning, decoding, playback and
   lifecycle.
+- `dance/DanceRegistry.java` — bundled dance plus user packs, per-pack frame count.
+- `dance/DanceTextures.java` — loads pack frames as dynamic textures and places them.
 - `config/menu/SpecialistDanceConfigScreen.java` — music and mod settings
   screen.
+- `config/menu/DanceLayoutScreen.java` — drag/zoom position editor (working tree).
 - `mixin/ClientPacketListenerMixin.java` — reports pickups of the local
   player.
 - `assets/specialist-dance/` — icon, bundled music and the 147 animation
   frames.
+- `tools/GifToFrames.java` — converts an animated GIF into a dance pack (dev-only).
 
 ## Technical notes
 

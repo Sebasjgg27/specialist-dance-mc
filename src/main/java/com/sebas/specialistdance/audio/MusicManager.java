@@ -167,7 +167,7 @@ public class MusicManager {
         return tracks;
     }
 
-    private void scanUserTracks() {
+    public void scanUserTracks() {
         userTracks.clear();
         Path musicDir = FabricLoader.getInstance()
             .getConfigDir()
@@ -222,7 +222,7 @@ public class MusicManager {
         try {
             AL10.alSourceStop(sourceId);
             AL10.alSourcei(sourceId, AL10.AL_BUFFER, bufferId);
-            AL10.alSourcei(sourceId, AL10.AL_LOOPING, AL10.AL_TRUE);
+            AL10.alSourcei(sourceId, AL10.AL_LOOPING, AL10.AL_FALSE);
             AL10.alSourcef(sourceId, AL10.AL_GAIN, Math.clamp(config.musicVolume, 0.0f, 1.0f));
             AL10.alSourcePlay(sourceId);
         } finally {
@@ -255,6 +255,21 @@ public class MusicManager {
 
         try {
             AL10.alSourceStop(sourceId);
+        } finally {
+            restoreContext(previous);
+        }
+    }
+
+    public boolean isPlaying() {
+        if (!available) {
+            return false;
+        }
+
+        long previous = makeContextCurrent();
+
+        try {
+            int state = AL10.alGetSourcei(sourceId, AL10.AL_SOURCE_STATE);
+            return state == AL10.AL_PLAYING;
         } finally {
             restoreContext(previous);
         }
@@ -340,7 +355,13 @@ public class MusicManager {
             STBVorbis.stb_vorbis_get_info(decoder, info);
 
             int sourceChannels = info.channels();
-            int channels = Math.min(sourceChannels, 2);
+
+            if (sourceChannels != 1 && sourceChannels != 2) {
+                log("unsupported channel count (" + sourceChannels + ") for track: " + trackName);
+                return false;
+            }
+
+            int channels = sourceChannels;
             int sampleRate = info.sample_rate();
             int samples = STBVorbis.stb_vorbis_stream_length_in_samples(decoder);
 
@@ -434,7 +455,13 @@ public class MusicManager {
                 return false;
             }
 
-            int outChannels = Math.min(srcChannels, 2);
+            int outChannels = srcChannels;
+
+            if (outChannels != 1 && outChannels != 2) {
+                log("unsupported channel count (" + outChannels + ") for track: " + trackName);
+                return false;
+            }
+
             ShortBuffer decoded = ByteBuffer.wrap(data)
                 .order(ByteOrder.LITTLE_ENDIAN)
                 .asShortBuffer();

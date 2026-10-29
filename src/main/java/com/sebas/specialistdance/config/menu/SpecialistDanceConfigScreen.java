@@ -1,6 +1,10 @@
 package com.sebas.specialistdance.config.menu;
 
 import java.util.List;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import net.fabricmc.loader.api.FabricLoader;
 
 import com.sebas.specialistdance.SpecialistDanceClient;
 import com.sebas.specialistdance.SpecialistDanceConfig;
@@ -18,9 +22,9 @@ import net.minecraft.network.chat.Component;
 public class SpecialistDanceConfigScreen extends Screen {
 
     private static final int BOX_WIDTH = 300;
-    private static final int ROW_HEIGHT = 20;
-    private static final int GAP = 4;
-    private static final int ROWS = 6;
+    private static final int ROW_HEIGHT = 18;
+    private static final int GAP = 2;
+    private static final int ROWS = 11;
     private static final int TOP_Y = 30;
     private static final int NOTE_HEIGHT = 12;
 
@@ -126,10 +130,100 @@ public class SpecialistDanceConfigScreen extends Screen {
 
         row += ROW_HEIGHT + GAP;
 
+        List<String> behaviors = List.of("stop", "hold", "loop");
+
+        if (!behaviors.contains(config.animationEndBehavior)) {
+            config.animationEndBehavior = "stop";
+        }
+
+        addRenderableWidget(
+            CycleButton.<String>builder(Component::literal, config.animationEndBehavior)
+                .withValues(behaviors)
+                .create(
+                    x, row, BOX_WIDTH, ROW_HEIGHT,
+                    Component.literal("End behavior"),
+                    (button, value) -> config.animationEndBehavior = value
+                )
+        );
+
+        row += ROW_HEIGHT + GAP;
+
         addRenderableWidget(
             Button.builder(Component.literal("Preview dance on close"), button -> previewDance = true)
                 .bounds(x, row, BOX_WIDTH, ROW_HEIGHT)
                 .build()
+        );
+
+        row += ROW_HEIGHT + GAP;
+
+        addRenderableWidget(
+            Button.builder(Component.literal("Position dance"), button -> {
+                minecraft.setScreen(new DanceLayoutScreen(config, danceRegistry, SpecialistDanceClient.getInstance().getDanceTextures(), this));
+            })
+                .bounds(x, row, BOX_WIDTH, ROW_HEIGHT)
+                .build()
+        );
+
+        row += ROW_HEIGHT + GAP;
+
+        addRenderableWidget(
+          Button.builder(Component.literal("Open music folder"), button -> {
+            Path musicDir = FabricLoader.getInstance()
+                .getConfigDir()
+                .resolve("specialist-dance")
+                .resolve("music");
+            try {
+                Files.createDirectories(musicDir);
+                String os = System.getProperty("os.name").toLowerCase();
+                if (os.contains("mac")) {
+                    new ProcessBuilder("open", musicDir.toString()).start();
+                } else if (os.contains("win")) {
+                    new ProcessBuilder("explorer", musicDir.toString()).start();
+                } else {
+                    new ProcessBuilder("xdg-open", musicDir.toString()).start();
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+          })  
+            .bounds(x, row, half, ROW_HEIGHT)
+            .build()
+        );
+
+        addRenderableWidget(
+            Button.builder(Component.literal("Open dances folder"), button -> {
+                Path dancesDir = FabricLoader.getInstance()
+                    .getConfigDir()
+                    .resolve("specialist-dance")
+                    .resolve("dances");
+                try {
+                    Files.createDirectories(dancesDir);
+                    String os = System.getProperty("os.name").toLowerCase();
+                    if (os.contains("mac")) {
+                        new ProcessBuilder("open", dancesDir.toString()).start();
+                    } else if (os.contains("win")) {
+                        new ProcessBuilder("explorer", dancesDir.toString()).start();
+                    } else {
+                        new ProcessBuilder("xdg-open", dancesDir.toString()).start();
+                    }
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            })
+                .bounds(x + half + 10, row, half, ROW_HEIGHT)
+                .build()
+        );
+
+        row += ROW_HEIGHT + GAP;
+
+        addRenderableWidget(
+            Button.builder(Component.literal("Rescan"), button -> {
+                music.scanUserTracks();
+                danceRegistry.scan();
+                rebuildWidgets();
+            })
+            .bounds(x, row, BOX_WIDTH, ROW_HEIGHT)
+            .build()
         );
 
         addRenderableWidget(
@@ -148,7 +242,7 @@ public class SpecialistDanceConfigScreen extends Screen {
             this.title,
             this.width / 2,
             12,
-            0xFFFFFF
+            0xFFFFFFFF
         );
 
         graphics.drawCenteredString(
@@ -156,7 +250,7 @@ public class SpecialistDanceConfigScreen extends Screen {
             Component.literal("Use clean GIFs - some may not look good"),
             this.width / 2,
             noteY,
-            0xAAAAAA
+            0xFFAAAAAA
         );
     }
 

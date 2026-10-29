@@ -19,6 +19,34 @@ public class DanceTextures {
 
     public record Frame(Identifier texture, int width, int height) {}
 
+    public record Placement(int x, int y, int width, int height, int stageX, int stageY, int stageWidth, int stageHeight) {
+        public boolean contains(int mouseX, int mouseY) {
+            return mouseX >= stageX && mouseX < stageX + stageWidth && mouseY >= stageY && mouseY < stageY + stageHeight;
+        }
+    }
+
+    public static Placement place(Frame frame, int stageWidthPercent, int stageHeightPercent, int positionX, int positionY, int guiWidth, int guiHeight) {
+        if (frame.width() <= 0 || frame.height() <= 0 || guiWidth <= 0 || guiHeight <= 0) {
+            return new Placement(0, 0, 0, 0, 0, 0, 0, 0);
+        }
+
+        int sw = Math.max(8, Math.min(guiWidth, (int) Math.round(guiWidth * Math.clamp(stageWidthPercent, 1, 100) / 100.0)));
+        int sh = Math.max(8, Math.min(guiHeight, (int) Math.round(guiHeight * Math.clamp(stageHeightPercent, 1, 100) / 100.0)));
+
+        double scale = Math.min((double) sw / frame.width(), (double) sh / frame.height());
+
+        int width = Math.max(1, (int) Math.round(frame.width() * scale));
+        int height = Math.max(1, (int) Math.round(frame.height() * scale));
+
+        int stageX = positionX >= 0 ? Math.min(positionX, guiWidth - sw) : (guiWidth - sw) / 2;
+        int stageY = positionY >= 0 ? Math.min(positionY, guiHeight - sh) : (guiHeight - sh) / 2;
+
+        int x = stageX + (sw - width) / 2;
+        int y = stageY + (sh - height) / 2;
+
+        return new Placement(x, y, width, height, stageX, stageY, sw, sh);
+    }
+
     private static final String NAMESPACE = "specialist-dance";
 
     private final Map<String, Frame> frames = new HashMap<>();
@@ -80,28 +108,44 @@ public class DanceTextures {
     }
 
     private Frame loadUserPack(Minecraft client, DanceRegistry.Dance dance, String fileName) {
+        // Minecraft paths reject anything outside [a-z0-9._-]; the folder name on disk may use any case.
+        String safeName = dance.name().toLowerCase().replaceAll("[^a-z0-9._-]", "_");
+
         Identifier location = Identifier.fromNamespaceAndPath(
             NAMESPACE,
-            "dances/%s/%s".formatted(dance.name(), fileName)
+            "dances/%s/%s".formatted(safeName, fileName)
         );
 
         NativeImage image;
+        int width;
+        int height;
 
         try (InputStream in = Files.newInputStream(dance.folder().resolve(fileName))) {
             image = NativeImage.read(in);
-        } catch (IOException e) {
+            width = image.getWidth();
+            height = image.getHeight();
+
+            if (width <= 0 || height <= 0) {
+                image.close();
+                log("frame has no pixels: " + dance.name() + "/" + fileName);
+                return null;
+            }
+
+            client.getTextureManager().register(
+                location,
+                new DynamicTexture(() -> location.toString(), image)
+            );
+        } catch (IOException | RuntimeException e) {
+            log("could not load frame" + fileName + " from " + dance.name() + ": " + e.getMessage());
             return null;
         }
 
-        int width = image.getWidth();
-        int height = image.getHeight();
-
-        client.getTextureManager().register(
-            location,
-            new DynamicTexture(() -> location.toString(), image)
-        );
         registered.add(location);
 
         return new Frame(location, width, height);
+    }
+
+    private void log(String message) {
+        System.out.println("Specialist Dance: " + message);
     }
 }
