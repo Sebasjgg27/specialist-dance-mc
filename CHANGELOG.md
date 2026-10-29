@@ -1,16 +1,32 @@
 # Changelog
 
-## Unreleased
+## 1.4.0
 
-Working-tree changes on top of `v1.4.0-rc1`. Not built into a release jar and not yet
-verified in-game — see `ROADMAP.md` Phase 5.
+Dance packs + layout editor. User-supplied PNG frame folders become selectable dances;
+the animation can be positioned and resized in-game.
 
+- Added: user dance packs from `.minecraft/config/specialist-dance/dances/<name>/` —
+  a folder of `frame_000.png … frame_NNN.png` becomes a selectable dance.
+- Added: `activeDance` config field and a **Dance pack** selector in the **K** menu.
+- Added: `dance/DanceRegistry` (pack scanning, frame-count detection) and
+  `dance/DanceTextures` (loads pack frames as dynamic textures, releases them on pack
+  change and shutdown).
 - Added: **Position dance** screen — drag the animation anywhere, scroll to zoom, with
   **Center**, **Fit** and **reset** buttons; the choice is saved on close.
 - Added: **Open music folder** and **Open dances folder** buttons in the **K** menu, so
   custom content is one click away.
 - Added: **Rescan** button — picks up music files and dance packs added since launch,
   without restarting the game.
+- Added: "Preview dance on close" button in the config screen.
+- Added: `tools/GifToFrames.java`, which converts an animated GIF into a dance pack.
+- Changed: the frame count is detected per pack instead of hardcoded to 147.
+- Changed: the config screen lays out every row from a computed cursor, so the dance
+  controls no longer collide with **Done** at short window heights.
+- Changed: animation end behaviors renamed to `stop`, `hold`, `loop` (all clear when
+  music stops); old `loop-until-music-ends` migrates to `loop`.
+- Fixed: blit overload now scales frames to the stage instead of cropping the top-left.
+- Fixed: text colors use ARGB so they render in 1.21.11.
+- Fixed: MP3 decode no longer uploads an empty OpenAL buffer.
 
 ## 1.4.0-rc1
 

@@ -33,7 +33,7 @@ config menu and user-supplied dance packs and tracks.
 | 3 | Better Detection | 1.2.0 | 10-15 → 10-18 | 4 d | 3 | ✅ | shipped, QA 1/7 🧪 |
 | 4 | Sound On | 1.3.0 | 10-19 → 10-23 | 5 d | 5 | ✅ | 100% |
 | 4b | More Music Formats | 1.3.1 | 10-24 | 1 d | 1 | ✅ | 100% |
-| 5 | Dance Packs + Layout | 1.4.0 | 10-25 → today | 2 d+ | 1 tagged + 5 files in progress | 🛠 | 7/10 built, 1 🧪 |
+| 5 | Dance Packs + Layout | 1.4.0 | 10-25 → 10-28 | 3 d | 9 | ✅ | 10/10 |
 | 6 | Animation Control | 1.5.0 | — | — | — | ⬜ | 0% |
 | 7 | Solid Ground | 1.6.0 | — | — | — | ⬜ | 0% |
 | 8 | Your Rules | 1.7.0 | — | — | — | ⬜ | 0% |
@@ -42,7 +42,7 @@ config menu and user-supplied dance packs and tracks.
 | 11 | Final Mix | 2.0.0 | — | — | — | ⬜ | 0% |
 | 12 | The Control Room | 2.1.0 | — | — | — | ⬜ | 0% |
 
-**Overall: 13 phases · 5 released · 1 in progress (Phase 5) · 7 not started.**
+**Overall: 13 phases · 6 released · 7 not started.**
 
 ## Current reality (2026-10-26)
 
@@ -121,7 +121,12 @@ config menu and user-supplied dance packs and tracks.
 
 ---
 
-## Phase 5 — v1.4.0: Dance Packs + Layout 🛠
+## Phase 5 — v1.4.0: Dance Packs + Layout ✅
+
+**Time:** 2026-10-25 → 2026-10-28 (3 days) · **Commits:** 9 · **Tag:** `v1.4.0` 2026-10-28
+**Progress:** 10/10 done.
+
+🛠
 
 **Time:** 2026-10-25 → in progress · `v1.4.0-rc1` tagged 2026-10-25 (`e654167`) · **Working tree:** 2026-10-26, uncommitted
 **Progress:** 7 of 10 items exist · 1 🧪 · **not ✅ until a user pack is seen rendering in Survival.**
@@ -149,15 +154,6 @@ config menu and user-supplied dance packs and tracks.
 - `DanceTextures.place()` + `Placement.contains()` — shared aspect-fit placement math.
 - K menu: **Open music folder**, **Open dances folder**, **Rescan** (rows 6 → 9);
   `MusicManager.scanUserTracks()` and `SpecialistDanceClient.getDanceTextures()` opened up.
-
-**Still open:**
-- [ ] Release blocker: a hand-made user pack observed rendering in Survival.
-- [ ] Commit and verify the layout screen; the HUD (`SpecialistDanceClient` ~184-195)
-      still duplicates the placement math instead of calling `DanceTextures.place()`.
-- [ ] Confirm an `activeDance` change actually reaches disk.
-- [ ] Re-check the bundled dance visually: correct now at 160×113, but ~30% less screen
-      area than v1.0.0–v1.3.1 showed. Accept it or raise `drawSize`; do not re-distort.
-- [ ] Update README + CHANGELOG, bump `mod_version` to 1.4.0, fresh `./gradlew build`, tag.
 
 ## Phase 6 — v1.5.0: Animation Control ⬜
 
