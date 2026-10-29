@@ -9,6 +9,8 @@ import java.util.Set;
 
 import com.sebas.specialistdance.audio.MusicManager;
 import com.sebas.specialistdance.config.menu.SpecialistDanceConfigScreen;
+import com.sebas.specialistdance.dance.DanceRegistry;
+import com.sebas.specialistdance.dance.DanceTextures;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
@@ -48,6 +50,8 @@ public class SpecialistDanceClient implements ClientModInitializer {
 
     private SpecialistDanceConfig config;
     private MusicManager musicManager;
+    private DanceRegistry danceRegistry;
+    private final DanceTextures danceTextures = new DanceTextures();
     private KeyMapping configKey;
     private long lastTriggerMillis = -1;
 
@@ -66,16 +70,20 @@ public class SpecialistDanceClient implements ClientModInitializer {
 
     private long animationStartMillis = -1;
 
-    private static final int FRAME_COUNT = 147;
-
     public static SpecialistDanceClient getInstance() {
         return instance;
+    }
+
+    public DanceTextures getDanceTextures() {
+        return danceTextures;
     }
 
     @Override
     public void onInitializeClient() {
         instance = this;
         config = SpecialistDanceConfig.load();
+        danceRegistry = new DanceRegistry(config);
+        danceRegistry.scan();
 
         System.out.println("Specialist Dance is Ready!");
 
@@ -94,7 +102,10 @@ public class SpecialistDanceClient implements ClientModInitializer {
             KeyMapping.Category.MISC
         ));
 
-        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> musicManager.shutdown());
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
+            musicManager.shutdown();
+            danceTextures.release(client);
+        });
 
         ClientPlayerBlockBreakEvents.AFTER.register(
             (world, player, pos, state) -> {
@@ -148,38 +159,75 @@ public class SpecialistDanceClient implements ClientModInitializer {
 
                 long elapsed = System.currentTimeMillis() - animationStartMillis;
 
-                int frameIndex = (int) (elapsed / config.frameDurationMs);
+                DanceRegistry.Dance dance = danceRegistry.find(config.activeDance);
 
-                if (frameIndex >= FRAME_COUNT) {
+                if (dance.frameCount() <= 0) {
+                    animationStartMillis = -1;
+                    musicManager.stop();
+                    return;
+                }
+                int frameIndex = (int) (elapsed / Math.max(1, config.frameDurationMs));
+
+                String behavior = config.animationEndBehavior;
+
+                if ("loop".equals(behavior)) {
+                    if (!musicManager.isPlaying()) {
+                        animationStartMillis = -1;
+                        return;
+                    }
+                    frameIndex = frameIndex % dance.frameCount();
+                } else if ("hold".equals(behavior)) {
+                    if (!musicManager.isPlaying()) {
+                        animationStartMillis = -1;
+                        return;
+                    }
+                    if (frameIndex >= dance.frameCount()) {
+                        frameIndex = dance.frameCount() - 1;
+                    }
+                } else {
+                    if (frameIndex >= dance.frameCount()) {
+                        animationStartMillis = -1;
+                        musicManager.stop();
+                        return;
+                    }
+                }
+
+                DanceTextures.Frame frame = danceTextures.get(
+                    Minecraft.getInstance(),
+                    dance,
+                    frameIndex
+                );
+
+                if (frame == null) {
+                    log("Specialist Dance: missing frame " + frameIndex + " of dance " + dance.name());
                     animationStartMillis = -1;
                     musicManager.stop();
                     return;
                 }
 
-                Identifier texture = Identifier.fromNamespaceAndPath(
-                    "specialist-dance",
-                    "textures/gui/frames/frame_%03d.png".formatted(frameIndex)
+                DanceTextures.Placement placement = DanceTextures.place(
+                    frame,
+                    config.stageWidthPercent,
+                    config.stageHeightPercent,
+                    config.positionX,
+                    config.positionY,
+                    graphics.guiWidth(),
+                    graphics.guiHeight()
                 );
-
-                int size = config.drawSize;
-                int x = config.positionX >= 0
-                    ? config.positionX
-                    : (graphics.guiWidth() - size) / 2;
-                int y = config.positionY >= 0
-                    ? config.positionY
-                    : (graphics.guiHeight() - size) / 2;
 
                 graphics.blit(
                     RenderPipelines.GUI_TEXTURED,
-                    texture,
-                    x,
-                    y,
+                    frame.texture(),
+                    placement.x(),
+                    placement.y(),
                     0.0f,
                     0.0f,
-                    size,
-                    size,
-                    size,
-                    size
+                    placement.width(),
+                    placement.height(),
+                    frame.width(),
+                    frame.height(),
+                    frame.width(),
+                    frame.height()
                 );
             }
         );
@@ -198,18 +246,20 @@ public class SpecialistDanceClient implements ClientModInitializer {
             pendingDrops.clear();
             triggeredOres.clear();
             lastLevel = client.level;
+            animationStartMillis = -1;
             musicManager.stop();
             return;
         }
 
         if (client.player != null && client.player.isDeadOrDying()) {
+            animationStartMillis = -1;
             musicManager.stop();
         }
 
         while (configKey.consumeClick()) {
             if (client.screen == null) {
                 client.setScreen(
-                    new SpecialistDanceConfigScreen(config, musicManager, client.screen)
+                    new SpecialistDanceConfigScreen(config, musicManager, danceRegistry, client.screen)
                 );
             }
         }

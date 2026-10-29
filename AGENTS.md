@@ -38,9 +38,12 @@ If builds fail with a connection error to port 8765, the mirror is not running. 
 - `src/main/java/com/sebas/specialistdance/SpecialistDanceClient.java` — entrypoint, keybind, detection pipeline, tick cleanup, HUD animation.
 - `src/main/java/com/sebas/specialistdance/SpecialistDanceConfig.java` — Gson config, defaults, `save()`/`load()`.
 - `src/main/java/com/sebas/specialistdance/audio/MusicManager.java` — OpenAL/STBVorbis music playback.
+- `src/main/java/com/sebas/specialistdance/dance/DanceRegistry.java` — scans `config/specialist-dance/dances/<pack>/` for `frame_NNN.png` packs; the bundled dance is `specialist`.
+- `src/main/java/com/sebas/specialistdance/dance/DanceTextures.java` — loads pack frames as `DynamicTexture`s and caches per-frame dimensions.
 - `src/main/java/com/sebas/specialistdance/config/menu/SpecialistDanceConfigScreen.java` — music config screen (keybind `K`).
 - `src/main/java/com/sebas/specialistdance/mixin/ClientPacketListenerMixin.java` — player pickup detection.
 - `src/main/resources/` — `fabric.mod.json`, mixin config, lang files, animation frames, bundled `sounds/default.ogg`.
+- `tools/` — dev-only, never shipped: `loom-mirror.sh` (metadata mirror) and `GifToFrames.java` (`java tools/GifToFrames.java <in.gif> <out-dir> [maxSize]` exports a GIF into a `frame_%03d.png` dance pack).
 - `ROADMAP.md` / `CHANGELOG.md` / `README.md` — phase plan, release history, user docs.
 
 ## Conventions
@@ -66,7 +69,16 @@ If builds fail with a connection error to port 8765, the mirror is not running. 
 
 - `Screen.renderWithTooltipAndSubtitles` already draws the background; do not call `renderBackground` in `render`.
 - `Checkbox` has a lowercase `b`; use `Checkbox.builder(...)`.
-- Re-validate the saved track name before building the `CycleButton` (a deleted user track would otherwise fail).
+- `CycleButton` composes its own label as `message + ": " + stringifier(value)`. The stringifier must return the bare value (`Component::literal`) or you get `Music track: Track: test-1`.
+- The HUD still renders while a `Screen` is open (`Gui.render` only early-returns for `LevelLoadingScreen`), but the screen paints over it — so a dance preview cannot be seen from inside the config menu; it fires from `onClose()`.
+- Re-validate the saved track and dance names before building their `CycleButton`s (a deleted user track or pack would otherwise fail).
+- `GuiGraphics.blit`'s last two ints are **UV divisors**, not a target size: pass the texture's real dimensions and put the scaled size in the `width`/`height` args, otherwise the image is cropped or squashed.
+- The config screen stacks its rows with a computed cursor (`ROWS`/`GAP`) and pushes `doneY` below the block. Anchoring rows at `height / 4` makes the last row collide with `Done` at the dev window's 240 logical pixels.
+
+### Dance frames
+
+- PNG is the only format that loads: `NativeImage.read` calls `PngInfo.validateHeader`, which demands the PNG magic before STB ever sees the bytes. GIF/JPEG/WebP are not options.
+- GIF frames are normally **deltas** — a sub-rect at an offset with `doNotDispose` and transparent pixels marking "keep what was here". `tools/GifToFrames.java` must composite each frame onto a logical-screen canvas and honour the disposal methods; writing `reader.read(i)` straight to PNG produces half-empty frames.
 
 ### Mixin
 
