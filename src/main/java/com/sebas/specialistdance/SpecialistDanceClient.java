@@ -69,6 +69,8 @@ public class SpecialistDanceClient implements ClientModInitializer {
     private static SpecialistDanceClient instance;
 
     private long animationStartMillis = -1;
+    private boolean musicDrivesAnimationEnd;
+    private int lastLoggedFrame = -1;
 
     public static SpecialistDanceClient getInstance() {
         return instance;
@@ -162,23 +164,22 @@ public class SpecialistDanceClient implements ClientModInitializer {
                 DanceRegistry.Dance dance = danceRegistry.find(config.activeDance);
 
                 if (dance.frameCount() <= 0) {
-                    animationStartMillis = -1;
-                    musicManager.stop();
+                    endAnimation("invalid pack " + dance.name());
                     return;
                 }
                 int frameIndex = (int) (elapsed / Math.max(1, config.frameDurationMs));
 
-                String behavior = config.animationEndBehavior;
+                String behavior = musicDrivesAnimationEnd ? config.animationEndBehavior : "stop";
 
                 if ("loop".equals(behavior)) {
                     if (!musicManager.isPlaying()) {
-                        animationStartMillis = -1;
+                        endAnimation("music ended while looping");
                         return;
                     }
                     frameIndex = frameIndex % dance.frameCount();
                 } else if ("hold".equals(behavior)) {
                     if (!musicManager.isPlaying()) {
-                        animationStartMillis = -1;
+                        endAnimation("music ended while holding");
                         return;
                     }
                     if (frameIndex >= dance.frameCount()) {
@@ -186,8 +187,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
                     }
                 } else {
                     if (frameIndex >= dance.frameCount()) {
-                        animationStartMillis = -1;
-                        musicManager.stop();
+                        endAnimation("one pass complete");
                         return;
                     }
                 }
@@ -200,8 +200,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
 
                 if (frame == null) {
                     log("Specialist Dance: missing frame " + frameIndex + " of dance " + dance.name());
-                    animationStartMillis = -1;
-                    musicManager.stop();
+                    endAnimation("missing frame " + frameIndex);
                     return;
                 }
 
@@ -214,6 +213,13 @@ public class SpecialistDanceClient implements ClientModInitializer {
                     graphics.guiWidth(),
                     graphics.guiHeight()
                 );
+
+                if (frameIndex != lastLoggedFrame) {
+                    lastLoggedFrame = frameIndex;
+                    log("Specialist Dance: frame " + frameIndex + "/" + dance.frameCount()
+                        + " x=" + placement.x() + " y=" + placement.y()
+                        + " " + placement.width() + "x" + placement.height());
+                }
 
                 graphics.blit(
                     RenderPipelines.GUI_TEXTURED,
@@ -239,6 +245,19 @@ public class SpecialistDanceClient implements ClientModInitializer {
         }
     }
 
+    private void endAnimation(String reason) {
+        if (animationStartMillis < 0) {
+            return;
+        }
+
+        log("Specialist Dance: animation ended (" + reason + ")"
+            + " behavior=" + config.animationEndBehavior
+            + " musicEnabled=" + config.musicEnabled
+            + " drivesEnd=" + musicDrivesAnimationEnd);
+        animationStartMillis = -1;
+        musicManager.stop();
+    }
+
     private void tick(Minecraft client) {
         if (client.level != lastLevel) {
             pendingOres.clear();
@@ -246,14 +265,12 @@ public class SpecialistDanceClient implements ClientModInitializer {
             pendingDrops.clear();
             triggeredOres.clear();
             lastLevel = client.level;
-            animationStartMillis = -1;
-            musicManager.stop();
+            endAnimation("world change");
             return;
         }
 
         if (client.player != null && client.player.isDeadOrDying()) {
-            animationStartMillis = -1;
-            musicManager.stop();
+            endAnimation("player death");
         }
 
         while (configKey.consumeClick()) {
@@ -409,5 +426,12 @@ public class SpecialistDanceClient implements ClientModInitializer {
         if (config.musicEnabled) {
             musicManager.play();
         }
+
+        musicDrivesAnimationEnd = config.musicEnabled && musicManager.isPlaying();
+        lastLoggedFrame = -1;
+
+        log("Specialist Dance: trigger behavior=" + config.animationEndBehavior
+            + " musicEnabled=" + config.musicEnabled
+            + " drivesEnd=" + musicDrivesAnimationEnd);
     }
 }
