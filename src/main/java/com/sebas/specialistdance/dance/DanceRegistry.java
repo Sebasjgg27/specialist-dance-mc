@@ -129,10 +129,6 @@ public class DanceRegistry {
         return added;
     }
 
-    public Set<String> knownNames() {
-        return new TreeSet<>(userDances.keySet());
-    }
-
     public boolean needsLayout(String name) {
         return userDances.containsKey(name)
             && (config.seenDances == null || !config.seenDances.contains(name));

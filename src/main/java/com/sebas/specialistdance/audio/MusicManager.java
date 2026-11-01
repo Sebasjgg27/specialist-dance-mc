@@ -281,10 +281,6 @@ public class MusicManager {
         return null;
     }
 
-    public void play() {
-        play(config.musicTrack);
-    }
-
     public void play(String trackName) {
         if (!available) {
             return;
