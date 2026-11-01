@@ -1,10 +1,12 @@
 package com.sebas.specialistdance;
 
 import java.io.IOException;
-import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Stream;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -39,15 +41,25 @@ public class SpecialistDanceConfig {
 
     public String animationEndBehavior = "stop";
     public String activeDance = "specialist";
+    public List<String> seenDances = new ArrayList<>();
+    public boolean seenDancesSeeded;
 
     public static SpecialistDanceConfig load() {
         try {
             if (Files.exists(PATH)) {
-                try (Reader reader = Files.newBufferedReader(PATH)) {
-                    SpecialistDanceConfig config = GSON.fromJson(reader, SpecialistDanceConfig.class);
+                try {
+                    String json = Files.readString(PATH);
+                    SpecialistDanceConfig config = GSON.fromJson(json, SpecialistDanceConfig.class);
 
                     if (config != null) {
                         config.sanitize();
+
+                        if (!config.seenDancesSeeded) {
+                            seedSeenDances(config);
+                            config.seenDancesSeeded = true;
+                            config.save();
+                        }
+
                         return config;
                     }
                 } catch (IOException e) {
@@ -70,8 +82,30 @@ public class SpecialistDanceConfig {
         }
 
         SpecialistDanceConfig config = new SpecialistDanceConfig();
+        config.seenDancesSeeded = true;
         config.save();
         return config;
+    }
+
+    private static void seedSeenDances(SpecialistDanceConfig config) {
+        Path dancesDir = PATH.getParent()
+            .resolve("specialist-dance")
+            .resolve("dances");
+
+        if (!Files.isDirectory(dancesDir)) {
+            return;
+        }
+
+        try (Stream<Path> dirs = Files.list(dancesDir)) {
+            dirs.filter(Files::isDirectory)
+                .map(dir -> dir.getFileName().toString())
+                .filter(name -> !name.startsWith(".") && !"specialist".equals(name))
+                .forEach(name -> {
+                    if (!config.seenDances.contains(name)) {
+                        config.seenDances.add(name);
+                    }
+                });
+        } catch (IOException ignored) {}
     }
 
     private void sanitize() {
@@ -97,6 +131,12 @@ public class SpecialistDanceConfig {
         if (activeDance == null || activeDance.isBlank()) {
             activeDance = "specialist";
         }
+
+        if (seenDances == null) {
+            seenDances = new ArrayList<>();
+        }
+
+        seenDances.removeIf(name -> name == null || name.isBlank());
 
         if (animationEndBehavior == null) {
             animationEndBehavior = "stop";

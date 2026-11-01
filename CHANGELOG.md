@@ -1,5 +1,59 @@
 # Changelog
 
+## Unreleased
+
+Dance packs can now carry their own timing and music, and a raw GIF can be imported
+without running the offline converter.
+
+- Added: drop a `.gif` into `config/specialist-dance/dances/` and press **Rescan**.
+  The mod composites the GIF frames, writes a `frame_NNN.png` pack, reads the GIF's
+  frame delay into `pack.json`, and treats the result as a new dance.
+- Added: optional sidecar files next to a dropped GIF — `<name>.ogg` (or another
+  supported audio format) and `<name>.json` (copied as `pack.json`).
+- Added: `pack.json` with `frameDurationMs` and `track`; per-pack timing overrides the
+  global `frameDurationMs`, and a pack's own audio is used while the track selector is
+  on `default`.
+- Added: pack audio appears in the music selector as `<pack>/<track>`.
+- Added: new dance packs open the **Position dance** editor once, both at startup and
+  after **Rescan**. The list of packs already shown is persisted in `seenDances`; on
+  upgrade, packs already in the folder are marked seen so they do not all pop at once.
+- Added: **Fit** now uses the current frame's aspect ratio, and the layout editor
+  previews the middle frame instead of a possibly blank frame 0.
+- Changed: **Rescan** releases cached pack textures so a replaced GIF or pack reloads.
+- Changed: **Play preview** in the K menu plays the track the active pack would use,
+  including its own audio, instead of always previewing the global selection.
+- Changed: a `pack.json` larger than 1 MB is ignored; the pack still plays with the
+  global timing. Unsupported pack audio formats (`.opus`, `.m4a`, …) are logged and
+  skipped instead of failing silently.
+- Changed: a pack folder named `specialist` is rejected because it would shadow the
+  bundled dance.
+- Fixed: raw `.gif` files in the dances root were ignored by the scanner.
+- Note: no proprietary `.specialgif` format. A GIF is converted to PNG frames because
+  `NativeImage.read` only accepts PNG; a custom container would still need the same
+  conversion and would not open in any image viewer.
+
+## 1.5.0
+
+Animation control. `animationEndBehavior` is no longer dead config: the HUD reads it,
+and the dance now has a defined end when there is no music to end it.
+
+- Added: `stop`, `hold` and `loop` are consumed by the animation — `stop` plays one
+  pass and clears the overlay, `hold` keeps the last frame, `loop` wraps around until
+  the music ends.
+- Added: `MusicManager.isPlaying()`, so the animation can tell when its track has
+  finished instead of guessing from a timer.
+- Added: one diagnostic line when a dance ends, naming the reason, the configured
+  behavior, `musicEnabled` and whether music was driving the end (`debug: true`).
+- Changed: with `musicEnabled: false`, or when no audio device is available, there is
+  no end signal for `hold` and `loop`, so both fall back to `stop` — one finite pass —
+  instead of cancelling on the first frame.
+- Changed: world change, player death, an invalid pack and a missing frame now end the
+  animation through the same path, which also stops the music.
+- Changed: an invalid dance pack says why — unreadable, no `frame_NNN.png` files, or a
+  frame run with gaps — instead of the same silent `-1` for all three.
+- Fixed: `hold` and `loop` with music off drew nothing at all; the animation was
+  cancelled while rendering frame 0.
+
 ## 1.4.0
 
 Dance packs + layout editor. User-supplied PNG frame folders become selectable dances;

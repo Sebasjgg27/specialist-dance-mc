@@ -1,5 +1,7 @@
 package com.sebas.specialistdance;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -8,6 +10,7 @@ import java.util.Map;
 import java.util.Set;
 
 import com.sebas.specialistdance.audio.MusicManager;
+import com.sebas.specialistdance.config.menu.DanceLayoutScreen;
 import com.sebas.specialistdance.config.menu.SpecialistDanceConfigScreen;
 import com.sebas.specialistdance.dance.DanceRegistry;
 import com.sebas.specialistdance.dance.DanceTextures;
@@ -23,6 +26,7 @@ import net.fabricmc.fabric.api.event.client.player.ClientPlayerBlockBreakEvents;
 
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.core.BlockPos;
@@ -70,7 +74,8 @@ public class SpecialistDanceClient implements ClientModInitializer {
 
     private long animationStartMillis = -1;
     private boolean musicDrivesAnimationEnd;
-    private int lastLoggedFrame = -1;
+    private DanceRegistry.Dance playingDance;
+    private final Deque<String> pendingLayout = new ArrayDeque<>();
 
     public static SpecialistDanceClient getInstance() {
         return instance;
@@ -85,7 +90,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
         instance = this;
         config = SpecialistDanceConfig.load();
         danceRegistry = new DanceRegistry(config);
-        danceRegistry.scan();
+        queueLayoutFor(danceRegistry.scan());
 
         System.out.println("Specialist Dance is Ready!");
 
@@ -155,19 +160,20 @@ public class SpecialistDanceClient implements ClientModInitializer {
                 "specialist_dance_overlay"
             ),
             (graphics, deltaTracker) -> {
-                if (animationStartMillis < 0) {
+                if (animationStartMillis < 0 || playingDance == null) {
                     return;
                 }
 
                 long elapsed = System.currentTimeMillis() - animationStartMillis;
 
-                DanceRegistry.Dance dance = danceRegistry.find(config.activeDance);
+                DanceRegistry.Dance dance = playingDance;
 
                 if (dance.frameCount() <= 0) {
                     endAnimation("invalid pack " + dance.name());
                     return;
                 }
-                int frameIndex = (int) (elapsed / Math.max(1, config.frameDurationMs));
+                int frameDurationMs = dance.frameDurationMs(config.frameDurationMs);
+                int frameIndex = (int) (elapsed / Math.max(1, frameDurationMs));
 
                 String behavior = musicDrivesAnimationEnd ? config.animationEndBehavior : "stop";
 
@@ -214,13 +220,6 @@ public class SpecialistDanceClient implements ClientModInitializer {
                     graphics.guiHeight()
                 );
 
-                if (frameIndex != lastLoggedFrame) {
-                    lastLoggedFrame = frameIndex;
-                    log("Specialist Dance: frame " + frameIndex + "/" + dance.frameCount()
-                        + " x=" + placement.x() + " y=" + placement.y()
-                        + " " + placement.width() + "x" + placement.height());
-                }
-
                 graphics.blit(
                     RenderPipelines.GUI_TEXTURED,
                     frame.texture(),
@@ -251,10 +250,12 @@ public class SpecialistDanceClient implements ClientModInitializer {
         }
 
         log("Specialist Dance: animation ended (" + reason + ")"
+            + " dance=" + (playingDance == null ? "?" : playingDance.name())
             + " behavior=" + config.animationEndBehavior
             + " musicEnabled=" + config.musicEnabled
             + " drivesEnd=" + musicDrivesAnimationEnd);
         animationStartMillis = -1;
+        playingDance = null;
         musicManager.stop();
     }
 
@@ -280,6 +281,8 @@ public class SpecialistDanceClient implements ClientModInitializer {
                 );
             }
         }
+
+        openPendingLayout(client);
 
         long now = System.currentTimeMillis();
 
@@ -389,6 +392,53 @@ public class SpecialistDanceClient implements ClientModInitializer {
         }
     }
 
+    public void queueLayoutFor(List<String> names) {
+        if (names == null) {
+            return;
+        }
+
+        for (String name : names) {
+            if (danceRegistry.needsLayout(name) && !pendingLayout.contains(name)) {
+                pendingLayout.add(name);
+            }
+        }
+
+        if (!pendingLayout.isEmpty()) {
+            log("queued layout editor for " + pendingLayout);
+        }
+    }
+
+    private void openPendingLayout(Minecraft client) {
+        if (client.level == null || client.player == null) {
+            return;
+        }
+
+        Screen current = client.screen;
+
+        if (current != null && !(current instanceof SpecialistDanceConfigScreen)) {
+            return;
+        }
+
+        while (!pendingLayout.isEmpty()) {
+            String name = pendingLayout.poll();
+
+            if (name == null || !danceRegistry.needsLayout(name)) {
+                continue;
+            }
+
+            config.activeDance = name;
+            danceRegistry.markLayoutSeen(name);
+            log("opening layout editor for new dance pack " + name);
+            client.setScreen(new DanceLayoutScreen(
+                config,
+                danceRegistry,
+                danceTextures,
+                current
+            ));
+            return;
+        }
+    }
+
     private Item expectedDrop(Block block) {
         if (block == Blocks.DIAMOND_ORE || block == Blocks.DEEPSLATE_DIAMOND_ORE) {
             return Items.DIAMOND;
@@ -423,15 +473,24 @@ public class SpecialistDanceClient implements ClientModInitializer {
         lastTriggerMillis = now;
         animationStartMillis = now;
 
+        DanceRegistry.Dance dance = danceRegistry.find(config.activeDance);
+        playingDance = dance;
+        String track = config.musicEnabled
+            ? musicManager.resolveTrackForDance(dance.name(), dance.track())
+            : null;
+
         if (config.musicEnabled) {
-            musicManager.play();
+            musicManager.play(track);
         }
 
-        musicDrivesAnimationEnd = config.musicEnabled && musicManager.isPlaying();
-        lastLoggedFrame = -1;
+        musicDrivesAnimationEnd = config.musicEnabled && musicManager.isPlaying() && !"stop".equals(config.animationEndBehavior);
 
-        log("Specialist Dance: trigger behavior=" + config.animationEndBehavior
+        log("Specialist Dance: trigger dance=" + dance.name()
+            + " frames=" + dance.frameCount()
+            + " behavior=" + config.animationEndBehavior
+            + " track=" + track
             + " musicEnabled=" + config.musicEnabled
+            + " frameDurationMs=" + dance.frameDurationMs(config.frameDurationMs)
             + " drivesEnd=" + musicDrivesAnimationEnd);
     }
 }

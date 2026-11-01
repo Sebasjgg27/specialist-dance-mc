@@ -45,6 +45,9 @@ public class MusicManager {
     private static final String BUNDLED_RESOURCE = "/assets/specialist-dance/sounds/default.ogg";
 
     private static final Set<String> SUPPORTED_EXTENSIONS = Set.of("ogg", "wav", "aiff", "aif", "au", "mp3", "flac");
+    private static final Set<String> UNSUPPORTED_AUDIO_EXTENSIONS = Set.of(
+        "opus", "m4a", "aac", "wma", "mp4", "webm"
+    );
 
     private final SpecialistDanceConfig config;
     private final Map<String, Path> userTracks = new TreeMap<>();
@@ -169,19 +172,38 @@ public class MusicManager {
 
     public void scanUserTracks() {
         userTracks.clear();
-        Path musicDir = FabricLoader.getInstance()
+
+        Path root = FabricLoader.getInstance()
             .getConfigDir()
-            .resolve("specialist-dance")
-            .resolve("music");
+            .resolve("specialist-dance");
+        Path musicDir = root.resolve("music");
+        Path dancesDir = root.resolve("dances");
 
         try {
             Files.createDirectories(musicDir);
         } catch (IOException e) {
             log("could not create music dir " + musicDir);
-            return;
         }
 
-        try (Stream<Path> files = Files.list(musicDir)) {
+        scanDir(musicDir, "");
+
+        try {
+            Files.createDirectories(dancesDir);
+        } catch (IOException e) {
+            log("could not create dances dir " + dancesDir);
+        }
+
+        scanDancePacks(dancesDir);
+
+        if (decodedTrack != null
+                && !BUNDLED_NAME.equals(decodedTrack)
+                && !userTracks.containsKey(decodedTrack)) {
+            decodedTrack = null;
+        }
+    }
+
+    private void scanDir(Path dir, String prefix) {
+        try (Stream<Path> files = Files.list(dir)) {
             files.filter(Files::isRegularFile).sorted().forEach(p -> {
                 String fileName = p.getFileName().toString();
                 int dot = fileName.lastIndexOf('.');
@@ -189,28 +211,91 @@ public class MusicManager {
                     return;
                 }
 
-                String ext = fileName.substring(dot +1).toLowerCase(Locale.ROOT);
+                String ext = fileName.substring(dot + 1).toLowerCase(Locale.ROOT);
                 if (!SUPPORTED_EXTENSIONS.contains(ext)) {
+                    if (!prefix.isEmpty() && UNSUPPORTED_AUDIO_EXTENSIONS.contains(ext)) {
+                        log("unsupported pack audio ignored: " + fileName);
+                    }
                     return;
                 }
 
-                String name = fileName.substring(0, dot);
-                if (userTracks.putIfAbsent(name, p) != null) {
+                String stem = fileName.substring(0, dot);
+                String key = prefix.isEmpty() ? stem : prefix + "/" + stem;
+                if (userTracks.putIfAbsent(key, p) != null) {
                     log("Duplicate track name ignored: " + fileName);
-                } 
+                }
             });
         } catch (IOException e) {
-            log("Could not scan music dir " + musicDir);
+            log("Could not scan music dir " + dir);
         }
     }
 
+    private void scanDancePacks(Path dancesDir) {
+        try (Stream<Path> dirs = Files.list(dancesDir)) {
+            dirs.filter(Files::isDirectory)
+                .filter(dir -> !dir.getFileName().toString().startsWith("."))
+                .sorted()
+                .forEach(dir -> scanDir(dir, dir.getFileName().toString()));
+        } catch (IOException e) {
+            log("Could not scan dance packs in " + dancesDir);
+        }
+    }
+
+    public String resolveTrackForDance(String danceName, String packTrack) {
+        String configured = config.musicTrack;
+
+        if (configured != null && !configured.isBlank()
+                && !BUNDLED_NAME.equals(configured)
+                && userTracks.containsKey(configured)) {
+            return configured;
+        }
+
+        String declared = resolvePackTrack(danceName, packTrack);
+
+        if (declared != null) {
+            return declared;
+        }
+
+        String auto = firstPackTrack(danceName);
+        return auto != null ? auto : BUNDLED_NAME;
+    }
+
+    private String resolvePackTrack(String danceName, String packTrack) {
+        if (packTrack == null || packTrack.isBlank()) {
+            return null;
+        }
+
+        String scoped = danceName + "/" + packTrack;
+        return userTracks.containsKey(scoped) ? scoped : null;
+    }
+
+    private String firstPackTrack(String danceName) {
+        String prefix = danceName + "/";
+
+        for (String key : userTracks.keySet()) {
+            if (key.startsWith(prefix)) {
+                return key;
+            }
+        }
+
+        return null;
+    }
+
     public void play() {
+        play(config.musicTrack);
+    }
+
+    public void play(String trackName) {
         if (!available) {
             return;
         }
 
-        if (!ensureTrackLoaded(config.musicTrack)) {
-            log("track '" + config.musicTrack + "' not found, trying default");
+        String requested = trackName == null || trackName.isBlank()
+            ? BUNDLED_NAME
+            : trackName;
+
+        if (!ensureTrackLoaded(requested)) {
+            log("track '" + requested + "' not found, trying default");
 
             if(!ensureTrackLoaded(BUNDLED_NAME)) {
                 return;

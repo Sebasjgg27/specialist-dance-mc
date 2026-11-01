@@ -3,8 +3,8 @@
 > Living document. Update it whenever a phase changes state.
 > If this file and the code disagree, the code wins and this file is wrong.
 
-**Latest release:** `v1.3.1` (2026-10-24) · **Pre-release:** `v1.4.0-rc1` (2026-10-25)
-**Branch:** `v1.4.0` · **History:** 18 commits, 2026-10-10 → 2026-10-26 (17 days)
+**Latest release:** `v1.4.0` (2026-10-28) · **In verification:** `v1.5.0` (branch `v1.5.0`, untagged)
+**Branch:** `v1.5.0` · **History:** 20 commits, 2026-10-10 → 2026-10-30 (21 days)
 
 ## What this project is
 
@@ -34,7 +34,8 @@ config menu and user-supplied dance packs and tracks.
 | 4 | Sound On | 1.3.0 | 10-19 → 10-23 | 5 d | 5 | ✅ | 100% |
 | 4b | More Music Formats | 1.3.1 | 10-24 | 1 d | 1 | ✅ | 100% |
 | 5 | Dance Packs + Layout | 1.4.0 | 10-25 → 10-28 | 3 d | 9 | ✅ | 10/10 |
-| 6 | Animation Control | 1.5.0 | — | — | — | ⬜ | 0% |
+| 6 | Animation Control | 1.5.0 | 10-30 | 1 d | 1 | 🧪 | 3/5 items 🧪 |
+| 6b | Dance Packages | TBD | 10-30 | 1 d | 0 | 🛠 | Plan A+B built, GIF drop-in 🧪 |
 | 7 | Solid Ground | 1.6.0 | — | — | — | ⬜ | 0% |
 | 8 | Your Rules | 1.7.0 | — | — | — | ⬜ | 0% |
 | 9 | Provable | 1.8.0 | — | — | — | ⬜ | 0% |
@@ -42,19 +43,23 @@ config menu and user-supplied dance packs and tracks.
 | 11 | Final Mix | 2.0.0 | — | — | — | ⬜ | 0% |
 | 12 | The Control Room | 2.1.0 | — | — | — | ⬜ | 0% |
 
-**Overall: 13 phases · 6 released · 7 not started.**
+**Overall: 14 phases · 6 released · 1 in verification · 1 built · 6 not started.**
 
-## Current reality (2026-10-26)
+## Current reality (2026-10-30)
 
 | Claim | State |
 |---|---|
 | Ore → drop → dance trigger path | 🧪 diamond / deepslate diamond only (`run/logs/latest.log` 20:55:32) |
 | Bundled `specialist` dance renders | ✅ shipped since v1.0.0 |
 | Music plays with the dance, all formats | ✅ released v1.3.0 / v1.3.1 |
-| Config screen edits and persists | 🧪 `musicTrack`, volume written to disk; `activeDance` never observed reaching disk |
-| A **user** dance pack renders in-game | 🛠 never seen — the release blocker for 1.4.0 |
-| Position/zoom editor | 🛠 in the working tree on 2026-10-26, uncommitted, unverified, not in the rc jar |
-| `animationEndBehavior` | 🛠 dead config — declared in a released version, zero consumers |
+| Config screen edits and persists | 🧪 `musicTrack`, volume and `activeDance` all observed reaching disk (`run/config/specialist-dance.json`, 2026-10-30 18:17) |
+| A **user** dance pack renders in-game | 🧪 the 29-frame `Zelda` pack drew a full pass, `hold` and `loop` × music off (`run/logs/latest.log` 18:08) |
+| Position/zoom editor | 🛠 shipped in `v1.4.0`; `place()` is proven by the frame logs, but no observation records dragging or zooming in the **Position dance** screen |
+| Drop a raw GIF / new pack and open the editor | 🧪 2026-10-30 19:18: `quicktest.gif` → 21 frames at 100 ms, only the new pack queued, `opening layout editor for new dance pack quicktest` after quick-play (`run/logs/specialist-dance-quickplay-2026-10-30.log`) |
+| Existing packs do not nag on upgrade | 🧪 a config without `seenDances` seeded the two valid existing packs; only `quicktest` was queued (`run/logs/specialist-dance-upgrade-2026-10-30.log`) |
+| Per-pack `pack.json` timing / audio | 🛠 built; no client log yet shows a pack playing at its own delay or with its own track |
+| `animationEndBehavior` | 🧪 `stop` / `hold` / `loop` × music on and off all logged on 2026-10-30 (17:47, 18:08, 18:17) |
+| `cooldownMs` | 🛠 consumed in `triggerDance()`, never tested — only `cooldownMs: 0` has an observation |
 | Automated tests | ⬜ none; `./gradlew test` is `NO-SOURCE` |
 | ModMenu entrypoint | ⬜ none |
 
@@ -126,14 +131,10 @@ config menu and user-supplied dance packs and tracks.
 **Time:** 2026-10-25 → 2026-10-28 (3 days) · **Commits:** 9 · **Tag:** `v1.4.0` 2026-10-28
 **Progress:** 10/10 done.
 
-🛠
-
-**Time:** 2026-10-25 → in progress · `v1.4.0-rc1` tagged 2026-10-25 (`e654167`) · **Working tree:** 2026-10-26, uncommitted
-**Progress:** 7 of 10 items exist · 1 🧪 · **not ✅ until a user pack is seen rendering in Survival.**
-
-**Advances in the rc** (`e654167`, 889 insertions across 11 files):
-- `frameDurationMs` stays global; `pack.json` metadata dropped from the plan — a per-pack
-  fps would be a second source of truth nobody asked for.
+**What shipped:**
+- `frameDurationMs` stayed global in 1.4.0; `pack.json` metadata was deliberately deferred.
+  Phase 6b reintroduced it because a dropped GIF needs its own delay to play at the right
+  speed, so per-pack timing now has a source that is not the global config.
 - Hardcoded `FRAME_COUNT = 147` removed; frame count derived per pack by folder scan.
 - `dance/DanceRegistry` — bundled `specialist` plus user packs from
   `config/specialist-dance/dances/<pack>/`.
@@ -147,25 +148,69 @@ config menu and user-supplied dance packs and tracks.
   and honours disposal methods.
 - Frames draw at their true aspect ratio (the bundled 498×351 frames had been stretched
   into a square box since v1.0.0) and the screen lays rows out from a computed cursor.
-
-**Advances in the tree, not committed or built into a jar** (2026-10-26):
 - `config/menu/DanceLayoutScreen` — **Position dance** screen: drag to move, scroll to
   zoom, Center / Fit / reset / Done, saves on close.
 - `DanceTextures.place()` + `Placement.contains()` — shared aspect-fit placement math.
 - K menu: **Open music folder**, **Open dances folder**, **Rescan** (rows 6 → 9);
   `MusicManager.scanUserTracks()` and `SpecialistDanceClient.getDanceTextures()` opened up.
 
-## Phase 6 — v1.5.0: Animation Control ⬜
+## Phase 6 — v1.5.0: Animation Control 🧪
 
-**Progress:** 0% · **Starts when 1.4.0 is tagged.**
-- `animationEndBehavior` consumers in the HUD: `stop` (default, today's behavior),
-  `hold`, `loop`, `loop-until-music-ends`; unknown value falls back to `stop`.
-- Prerequisite: `MusicManager` exposes no playback status — it needs `isPlaying()` or a
-  decoded duration before `loop-until-music-ends` can exist.
-- Define the no-music fallback (`musicEnabled` false = no end signal).
-- Overlapping-restart guard must know whether the current animation is finite, or `loop`
-  blocks every future dance.
-- Verify `cooldownMs` (consumed in code, never tested) incl. default `0` and world change.
+**Time:** 2026-10-30 · **Branch:** `v1.5.0`, untagged, unpushed.
+**Progress:** 3 of 5 items 🧪 · not ✅ until `cooldownMs` is observed at a non-zero value
+and the tag exists.
+
+- 🧪 `animationEndBehavior` consumers in the HUD: `stop` plays one pass then clears the
+  overlay, `hold` keeps the last frame, `loop` wraps. The **K** menu selector offers these
+  three and an unknown value falls back to `stop`. `loop-until-music-ends` stays a
+  load-time migration alias rather than a fourth value — `loop` now means exactly that.
+- 🧪 Prerequisite met: `MusicManager.isPlaying()` is the end signal for `hold` and `loop`.
+- 🧪 No-music fallback: `triggerDance()` reads `isPlaying()` once, after `play()`, into
+  `musicDrivesAnimationEnd`, and the HUD uses `behavior = drivesEnd ? config : "stop"`.
+  With music off there is no end signal, so `hold` and `loop` run one finite pass instead
+  of cancelling while rendering frame 0. All 6 cells (stop/hold/loop × music on/off)
+  logged on 2026-10-30; `music ended while holding` is observed, `music ended while
+  looping` is not.
+- 🛠 Overlapping restart: `triggerDance()` overwrites `animationStartMillis`, so a new ore
+  restarts a running `loop` instead of being blocked by it. A restart logs no end line —
+  a restart is not an end. Deliberately left without a separate guard.
+- ⬜ `cooldownMs` — consumed in `triggerDance()`, only ever observed at `0`. It is also
+  never reset on world change, and the no-audio-device path (`isPlaying()` false because
+  OpenAL is unavailable) has no observation.
+
+## Phase 6b — Dance Packages 🛠
+
+**Time:** 2026-10-30 · **Branch:** `v1.5.0` working tree, untagged, uncommitted.
+**Progress:** Plan A + B built; the raw-GIF path is 🧪. Version TBD — the plan scoped this
+as v1.6.0, but Phase 7 still owns that number until a release decision is made.
+
+- 🧪 `DanceRegistry.scan()` is add-aware and returns new pack names; startup and
+  **Rescan** queue them; the **Position dance** editor opens once per pack and returns to
+  its parent screen. Observed 2026-10-30 19:18: `quicktest.gif` imported as 21 frames at
+  100 ms, only `quicktest` was queued, and `opening layout editor for new dance pack
+  quicktest` appeared after quick-play
+  (`run/logs/specialist-dance-quickplay-2026-10-30.log`).
+- 🧪 `seenDances` persists packs the editor has shown. An old config without the key seeds
+  the folders already present, so upgrading does not nag for every existing pack; a newly
+  dropped GIF is still queued. Observed: `found new dance packs: [Zelda, abu, quicktest]`
+  but `queued layout editor for [quicktest]`.
+- 🧪 Raw `.gif` in the dances root is composited to `frame_NNN.png` by `GifImporter`
+  (logical-screen canvas, disposal methods honoured); caps are 2000 frames, 50 MB, 16M
+  pixels and 512 px per side; the GIF's average delay is written to `pack.json`.
+- 🧪 Sidecars `<stem>.<audio-ext>` and `<stem>.json` next to a dropped GIF are copied into
+  the new pack. Observed 2026-10-30 19:21: `sidecartest.gif` + `.mp3` + `.json` produced
+  21 PNGs, the MP3, and `pack.json` `{"frameDurationMs":250,"track":"test-1"}`
+  (`run/logs/specialist-dance-sidecar-2026-10-30.log`).
+- 🛠 `pack.json` `frameDurationMs` overrides the global timing; `track` names the pack's
+  own audio. Pack tracks appear in the selector as `<pack>/<stem>` and play when
+  `musicTrack` is `default`.
+- 🧪 A `pack.json` over 1 MB is refused and the pack still loads with global timing.
+  Observed 2026-10-30 19:26: `pack.json for bigjson is too large`
+  (`run/logs/specialist-dance-bigjson-2026-10-30.log`).
+- 🛠 **Rescan** releases cached pack textures so a replaced pack reloads.
+- 🛠 **Fit** uses the current frame's aspect ratio; the editor previews the middle frame.
+- ⬜ Zip/`.dancepack` import (plan Task 8) is not implemented.
+- ⬜ Per-pack layout still does not exist; the stage remains global.
 
 ## Phase 7 — v1.6.0: Solid Ground ⬜
 
@@ -225,20 +270,50 @@ Anything 🛠 at release time sits here until it is 🧪.
       side by side → no mis-association; chest/trade/mob/old ground drop → no trigger;
       drop > 4 blocks → no trigger; re-mine the same spot → triggers again;
       dimension change/disconnect → no stale trigger.
-- [ ] `animationEndBehavior` is dead config in a released version.
-- [ ] `DanceRegistry.countFrames` returns `-1` for empty, gapped and unreadable packs
-      alike, so the debug log cannot tell them apart.
-- [ ] The `putIfAbsent` duplicate-name branch in `DanceRegistry.scan` is unreachable.
-- [ ] The layout screen and folder/Rescan buttons exist only in the working tree.
+- [x] 🧪 `animationEndBehavior` is dead config in a released version — consumed by the HUD
+      in `v1.5.0`; `stop` / `hold` / `loop` × music on and off logged 2026-10-30.
+- [x] 🧪 `DanceRegistry.countFrames` returns `-1` for empty, gapped and unreadable packs
+      alike — each case now logs its own reason. Observed 2026-10-30 19:11:
+      `empty-dance has no frame_NNN.png files` and `gapped-dance has 2 numbered frames
+      from frame_000 to frame_002`
+      (`run/logs/specialist-dance-import-2026-10-30.log`).
+- [x] 🛠 The `putIfAbsent` duplicate-name branch in `DanceRegistry.scan` is unreachable —
+      deleted (`Files.list` cannot yield one name twice); nothing to observe.
+- [x] 🛠 The layout screen and folder/Rescan buttons exist only in the working tree —
+      committed and tagged in `v1.4.0`.
+- [ ] `music ended while looping` has never been logged: `loop` × music on is proven to
+      wrap, but its end path has no observation.
+- [ ] The **Position dance** screen has never been observed dragging or zooming a dance;
+      only `DanceTextures.place()` output is in the logs.
+- [ ] `cooldownMs` has no observation above `0`, and `lastTriggerMillis` is never cleared
+      on world change.
+- [ ] `drawSize`, `stageWidth` and `stageHeight` are written to every config file and read
+      by nothing since `v1.4.0` — rule 3 wants a field to ship with the code that reads it
+      and the control that edits it.
+- [ ] `pack.json` `frameDurationMs` and per-pack audio are built but not observed: no
+      client log yet shows a pack playing at its own delay or with its own track.
+- [ ] Per-pack layout does not exist; moving a new pack still moves every dance.
+- [ ] GIF conversion runs on the render thread during **Rescan**. Caps bound the work, but
+      a large GIF can still hitch the client.
+- [ ] `DanceTextures.safeName` lowercases pack names, so `Abu` and `abu` still collide in
+      the texture namespace even though `DanceRegistry` keeps them distinct.
+- [ ] Zip/`.dancepack` bundle import is unbuilt; a raw GIF or a hand-made folder is the
+      only drop-in path.
+- [ ] The **Rescan** path (editor over the config screen, then **Done** returns to it) is
+      not observed; only the startup + quick-play path is proven.
+- [ ] `tools/GifToFrames.java` still carries its own compositing copy. The runtime
+      `GifImporter` duplicates it because the documented single-file launch on Java 21
+      cannot import the mod class.
 
 ## Out of scope / future ideas
 
 - Server-side sync (multiple players dancing together).
 - Localization (lang files) beyond the current keybind entries.
-- Loading GIF/JPEG/WebP frames directly — `NativeImage.read` calls `PngInfo.validateHeader`,
+- Loading JPEG/WebP frames directly — `NativeImage.read` calls `PngInfo.validateHeader`,
   which demands the PNG magic before STB sees the bytes, so PNG is the only decodable
-  frame format; users convert with `tools/GifToFrames`.
-- `pack.json` per-dance metadata (dropped from v1.4.0).
+  frame format. Raw GIF is converted to PNG at import; other formats stay offline.
+- Proprietary `.specialgif` / `.mcgif` containers — rejected. A GIF or a folder covers the
+  use case, and a custom container would still need the same PNG conversion.
 - Cloud/shared dance pack browser.
 
 ## Release rules

@@ -99,7 +99,10 @@ public class SpecialistDanceConfigScreen extends Screen {
         int half = (BOX_WIDTH - 10) / 2;
 
         addRenderableWidget(
-            Button.builder(Component.literal("Play preview"), button -> music.play())
+            Button.builder(Component.literal("Play preview"), button -> {
+                DanceRegistry.Dance dance = danceRegistry.find(config.activeDance);
+                music.play(music.resolveTrackForDance(dance.name(), dance.track()));
+            })
                 .bounds(x, row, half, ROW_HEIGHT)
                 .build()
         );
@@ -218,8 +221,10 @@ public class SpecialistDanceConfigScreen extends Screen {
 
         addRenderableWidget(
             Button.builder(Component.literal("Rescan"), button -> {
+                List<String> added = danceRegistry.scan();
                 music.scanUserTracks();
-                danceRegistry.scan();
+                SpecialistDanceClient.getInstance().getDanceTextures().release(minecraft);
+                SpecialistDanceClient.getInstance().queueLayoutFor(added);
                 rebuildWidgets();
             })
             .bounds(x, row, BOX_WIDTH, ROW_HEIGHT)
@@ -247,11 +252,15 @@ public class SpecialistDanceConfigScreen extends Screen {
 
         graphics.drawCenteredString(
             this.font,
-            Component.literal("Use clean GIFs - some may not look good"),
+            Component.literal("Drop a GIF in dances, then Rescan - clean GIFs look best"),
             this.width / 2,
             noteY,
             0xFFAAAAAA
         );
+    }
+
+    public void refreshWidgets() {
+        rebuildWidgets();
     }
 
     @Override

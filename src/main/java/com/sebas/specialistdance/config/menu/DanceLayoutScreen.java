@@ -47,10 +47,7 @@ public class DanceLayoutScreen extends Screen {
         );
 
         addRenderableWidget(
-            Button.builder(Component.literal("Fit"), button -> {
-                config.stageWidthPercent = 40;
-                config.stageHeightPercent = 40;
-            })
+            Button.builder(Component.literal("Fit"), button -> fitStage())
                 .bounds(startX + buttonWidth + 4, y, buttonWidth, buttonHeight)
                 .build()
         );
@@ -155,7 +152,7 @@ public class DanceLayoutScreen extends Screen {
         super.render(graphics, mouseX, mouseY, partialTick);
 
         graphics.drawCenteredString(this.font, this.title, this.width / 2, 10, 0xFFFFFFFF);
-        graphics.drawCenteredString(this.font, "Drag the box to move · wheel to resize", this.width / 2, 25, 0xFFAAAAAA);
+        graphics.drawCenteredString(this.font, "Drag to move · wheel to resize · previews the middle frame", this.width / 2, 25, 0xFFAAAAAA);
 
         String pos = "Stage at " + (config.positionX < 0 ? "auto-center" : placement.stageX() + ", " + placement.stageY());
         String size = "Stage " + config.stageWidthPercent + "% x " + config.stageHeightPercent
@@ -168,12 +165,41 @@ public class DanceLayoutScreen extends Screen {
     @Override
     public void onClose() {
         config.save();
+
+        if (parent instanceof SpecialistDanceConfigScreen configScreen) {
+            configScreen.refreshWidgets();
+        }
+
         this.minecraft.setScreen(parent);
+    }
+
+    private void fitStage() {
+        DanceTextures.Frame frame = currentFrame();
+
+        if (frame == null || this.width <= 0 || this.height <= 0) {
+            return;
+        }
+
+        double scale = Math.min(
+            this.width * 0.8 / frame.width(),
+            this.height * 0.8 / frame.height()
+        );
+
+        int drawWidth = Math.max(1, (int) Math.round(frame.width() * scale));
+        int drawHeight = Math.max(1, (int) Math.round(frame.height() * scale));
+
+        config.stageWidthPercent = Math.clamp(
+            (int) Math.round(drawWidth * 100.0 / this.width), 5, 100
+        );
+        config.stageHeightPercent = Math.clamp(
+            (int) Math.round(drawHeight * 100.0 / this.height), 5, 100
+        );
     }
 
     private DanceTextures.Frame currentFrame() {
         DanceRegistry.Dance dance = danceRegistry.find(config.activeDance);
-        return danceTextures.get(Minecraft.getInstance(), dance, 0);
+        int index = dance.frameCount() > 1 ? dance.frameCount() / 2 : 0;
+        return danceTextures.get(Minecraft.getInstance(), dance, index);
     }
 
     private DanceTextures.Placement currentPlacement() {

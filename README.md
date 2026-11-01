@@ -51,7 +51,7 @@ Anything else — including copper, lapis, redstone and coal — is ignored.
 
 1. Install [Fabric Loader](https://fabricmc.net/use/installer/) for 1.21.11
    and **Fabric API**.
-2. Drop `specialist-dance-1.4.0-rc1.jar` into your `mods/` folder.
+2. Drop `specialist-dance-1.5.0.jar` into your `mods/` folder.
 3. Launch the game — you should see `Specialist Dance is Ready!` in the log.
 
 The mod does not need to be installed on the server.
@@ -74,14 +74,20 @@ Missing keys fall back to defaults and are added back to the file automatically.
 | `searchRadiusSquared` | `16.0` | Max distance (squared blocks) from drop to ore — `16` = 4 blocks. |
 | `dropResolveTimeoutMs` | `2000` | How long to wait for an item entity to receive its item data. |
 | `frameDurationMs` | `50` | Milliseconds per animation frame. |
-| `drawSize` | `160` | Size of the animation on screen, in pixels. |
-| `positionX` | `-1` | X position; `-1` centres it horizontally. |
-| `positionY` | `-1` | Y position; `-1` centres it vertically. |
+| `stageWidthPercent` | `35` | Share of the screen width the dance stage may use; each frame is scaled to fit inside it. |
+| `stageHeightPercent` | `33` | Share of the screen height the dance stage may use. |
+| `positionX` | `-1` | X of the stage's top-left; `-1` centres it horizontally. |
+| `positionY` | `-1` | Y of the stage's top-left; `-1` centres it vertically. |
 | `cooldownMs` | `0` | Minimum gap between dances; `0` = none. |
 | `musicEnabled` | `true` | Play music while the dance animation is active. |
 | `musicVolume` | `1.0` | Music volume from `0.0` to `1.0`. |
 | `musicTrack` | `"default"` | Track name: `default` or a custom filename without its extension. |
+| `animationEndBehavior` | `"stop"` | What happens when the frames run out: `stop` clears the dance, `hold` keeps the last frame, `loop` repeats until the music ends. An unknown value falls back to `stop`. With music off there is no end signal, so `hold` and `loop` both play exactly one pass. |
 | `activeDance` | `"specialist"` | Dance to play: `specialist` (bundled) or a folder name from the dances folder. |
+
+`drawSize`, `stageWidth` and `stageHeight` are still written to the file, but nothing
+reads them: since `v1.4.0` the stage is sized from the percentages above and each frame
+keeps its own aspect ratio.
 
 **Tip:** set `"debug": true` to watch the pipeline — it prints three lines
 per ore:
@@ -104,6 +110,9 @@ Music starts when a dance triggers and stops when the animation ends.
 
 - The filename becomes the track name, without its extension. For example,
   `victory.ogg` becomes `victory`.
+- A dance pack can also carry its own audio file; see
+  [Custom dances](#custom-dances). Pack tracks appear in the selector as
+  `<pack>/<track>`.
 - `default` is reserved for the bundled track.
 - Press **K** in-game with no other screen open to change the track, volume or
   music setting.
@@ -114,47 +123,77 @@ up by **Rescan** (see below) or on the next launch.
 
 ## Custom dances
 
-The bundled animation is named `specialist`. To add your own, create a folder
-per dance:
+The bundled animation is named `specialist`. The easiest way to add your own is to
+drop an animated GIF into the dances folder:
 
 ```text
-.minecraft/config/specialist-dance/dances/<name>/frame_000.png
-.minecraft/config/specialist-dance/dances/<name>/frame_001.png
-...
+.minecraft/config/specialist-dance/dances/mydance.gif
 ```
 
-- The folder name becomes the dance name, selectable with **K** → **Dance pack**.
-- Frames must be numbered from `000` with no gaps; the count is detected
+Press **K** → **Rescan**. The mod converts the GIF into a pack, reads the GIF's own
+frame delay, and opens the **Position dance** editor for it. The folder it creates is:
+
+```text
+.minecraft/config/specialist-dance/dances/mydance/
+  frame_000.png
+  frame_001.png
+  ...
+  pack.json
+```
+
+- The file or folder name becomes the dance name, selectable with **K** → **Dance pack**.
+- Frames are written numbered from `000` with no gaps; the count is detected
   automatically. A pack with a hole in the sequence is skipped.
-- PNG is the only image format the mod can decode — `NativeImage.read` checks the
-  PNG header before handing the bytes to the texture loader, so `.gif`, `.jpg`
-  and `.webp` files cannot be used as frames directly.
-- A GIF usually stores only the pixels that change between frames, so the
-  converter rebuilds every frame on top of the previous one before writing it.
-  Check the result: a pack whose frames look torn or half-empty came from a
-  badly exported GIF, and some GIFs simply will not look good as a dance.
-- A GIF with its own background paints an opaque box over the game; only GIFs
-  with a real transparent background blend in.
-- GIFs are not loaded directly — export them to PNG frames first:
+- The first time a new pack is found, the **Position dance** editor opens. Move the
+  stage with the mouse, resize it with the wheel, then press **Done**. The editor does
+  not reopen for that pack on later launches or rescans.
+- A GIF is imported only once. To replace an existing dance, delete its folder from
+  `dances/` first; dropping a GIF with the same name again is skipped.
+- PNG is the only image format the mod decodes at render time. GIFs are converted to
+  PNG when imported; `.jpg` and `.webp` are not supported.
+- A GIF usually stores only the pixels that change between frames, so the importer
+  rebuilds every frame on top of the previous one. Some GIFs simply will not look good
+  as a dance, and a GIF with its own background paints an opaque box over the game.
+- You can still add a folder of PNG frames by hand. Frames must be numbered from `000`
+  with no gaps.
+- `pack.json` is optional and can override the GIF delay or choose a track:
+
+  ```json
+  {
+    "frameDurationMs": 100,
+    "track": "mydance"
+  }
+  ```
+
+  `frameDurationMs` is clamped to 10–10000 ms. An invalid value falls back to the
+  global `frameDurationMs`.
+- To give a pack its own music, put an audio file next to the frames (or next to the
+  GIF before importing) with the same name:
+
+  ```text
+  .minecraft/config/specialist-dance/dances/mydance/mydance.ogg
+  ```
+
+  The pack's audio is used automatically while the track selector is on `default`.
+  Choosing another track in the **K** menu overrides it.
+- Both folders are scanned at startup, and **K** → **Rescan** picks up GIFs, music tracks
+  and dance packs added since launch without restarting the game.
+- Offline conversion is still available:
 
   ```sh
   java tools/GifToFrames.java mydance.gif ../config/specialist-dance/dances/mydance 256
   ```
 
-- Like music, the dances folder is scanned at startup, so restart after adding
-  files. (The in-progress **Rescan** button covers music tracks only; dance packs
-  still need a restart.)
-
 ## Settings screen
 
 Press **K** (with no other screen open) for: music on/off, volume, track selector,
-**Play preview** / **Stop**, the **Dance pack** selector, **Preview dance on close**
-and **Done**. Everything is written to `specialist-dance.json` when the screen closes.
+**Play preview** / **Stop**, the **Dance pack** selector, the **End behavior** selector,
+**Preview dance on close**, **Position dance** (drag to move, scroll to zoom, **Center** /
+**Fit** / **reset**), **Open music folder** and **Open dances folder**, **Rescan** and
+**Done**. Everything is written to `specialist-dance.json` when the screen closes.
 
-Not in the `1.4.0-rc1` jar yet — it is in the working tree, unverified: a **Position
-dance** editor (drag to move, scroll to zoom, **Center** / **Fit** / **reset**),
-**Open music folder** and **Open dances folder** shortcuts, and a **Rescan** button
-that picks up files added since launch without a restart.
+**Preview dance on close** starts the animation as the screen shuts: the HUD paints
+behind any open screen, so a preview could not be seen from inside the menu.
 
 ## How it works
 
