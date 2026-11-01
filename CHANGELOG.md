@@ -2,8 +2,30 @@
 
 ## Unreleased
 
-Dance packs can now carry their own timing and music, and a raw GIF can be imported
-without running the offline converter.
+## 1.5.0
+
+Animation control + dance packages. `animationEndBehavior` is no longer dead config, and raw GIFs can be imported directly in-game.
+
+**Animation control:**
+
+- Added: `stop`, `hold` and `loop` are consumed by the animation — `stop` plays one
+  pass and clears the overlay, `hold` keeps the last frame, `loop` wraps around until
+  the music ends.
+- Added: `MusicManager.isPlaying()`, so the animation can tell when its track has
+  finished instead of guessing from a timer.
+- Added: one diagnostic line when a dance ends, naming the reason, the configured
+  behavior, `musicEnabled` and whether music was driving the end (`debug: true`).
+- Changed: with `musicEnabled: false`, or when no audio device is available, there is
+  no end signal for `hold` and `loop`, so both fall back to `stop` — one finite pass —
+  instead of cancelling on the first frame.
+- Changed: world change, player death, an invalid pack and a missing frame now end the
+  animation through the same path, which also stops the music.
+- Changed: an invalid dance pack says why — unreadable, no `frame_NNN.png` files, or a
+  frame run with gaps — instead of the same silent `-1` for all three.
+- Fixed: `hold` and `loop` with music off drew nothing at all; the animation was
+  cancelled while rendering frame 0.
+
+**Dance packages:**
 
 - Added: drop a `.gif` into `config/specialist-dance/dances/` and press **Rescan**.
   The mod composites the GIF frames, writes a `frame_NNN.png` pack, reads the GIF's
@@ -31,28 +53,6 @@ without running the offline converter.
 - Note: no proprietary `.specialgif` format. A GIF is converted to PNG frames because
   `NativeImage.read` only accepts PNG; a custom container would still need the same
   conversion and would not open in any image viewer.
-
-## 1.5.0
-
-Animation control. `animationEndBehavior` is no longer dead config: the HUD reads it,
-and the dance now has a defined end when there is no music to end it.
-
-- Added: `stop`, `hold` and `loop` are consumed by the animation — `stop` plays one
-  pass and clears the overlay, `hold` keeps the last frame, `loop` wraps around until
-  the music ends.
-- Added: `MusicManager.isPlaying()`, so the animation can tell when its track has
-  finished instead of guessing from a timer.
-- Added: one diagnostic line when a dance ends, naming the reason, the configured
-  behavior, `musicEnabled` and whether music was driving the end (`debug: true`).
-- Changed: with `musicEnabled: false`, or when no audio device is available, there is
-  no end signal for `hold` and `loop`, so both fall back to `stop` — one finite pass —
-  instead of cancelling on the first frame.
-- Changed: world change, player death, an invalid pack and a missing frame now end the
-  animation through the same path, which also stops the music.
-- Changed: an invalid dance pack says why — unreadable, no `frame_NNN.png` files, or a
-  frame run with gaps — instead of the same silent `-1` for all three.
-- Fixed: `hold` and `loop` with music off drew nothing at all; the animation was
-  cancelled while rendering frame 0.
 
 ## 1.4.0
 
