@@ -3,11 +3,11 @@ package com.sebas.specialistdance;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Objects;
+import org.jspecify.annotations.NonNull;
 
 import com.sebas.specialistdance.audio.MusicManager;
 import com.sebas.specialistdance.config.SpecialistDanceConfig;
@@ -31,6 +31,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Vec3i;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -62,12 +63,12 @@ public class SpecialistDanceClient implements ClientModInitializer {
 
     private record PendingOre(Item expectedItem, long createdAtMillis) {}
 
-    private record DropLink(BlockPos orePos, long linkedAtMillis) {}
+    private record DropLink(@NonNull BlockPos orePos, long linkedAtMillis) {}
 
-    private final Map<BlockPos, PendingOre> pendingOres = new HashMap<>();
+    private final Map<@NonNull BlockPos, PendingOre> pendingOres = new HashMap<>();
     private final Map<Integer, DropLink> dropLinks = new HashMap<>();
     private final Map<Integer, Long> pendingDrops = new HashMap<>();
-    private final Set<BlockPos> triggeredOres = new HashSet<>();
+    private final Map<@NonNull BlockPos, Long> triggeredOres = new HashMap<>();
 
     private ClientLevel lastLevel;
 
@@ -258,7 +259,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
         }
     }
 
-    private int effectiveFrameDurationMs(DanceRegistry.Dance dance) {
+    public int effectiveFrameDurationMs(DanceRegistry.Dance dance) {
         double speedMultiplier = dance.speedMultiplier(config.animationSpeed);
         return Math.max(1, Math.round((float) (dance.frameDurationMs(config.frameDurationMs) / speedMultiplier)));
     }
@@ -296,7 +297,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
         while (configKey.consumeClick()) {
             if (client.screen == null) {
                 client.setScreen(
-                    new SpecialistDanceConfigScreen(config, musicManager, danceRegistry, client.screen)
+                    new SpecialistDanceConfigScreen(config, musicManager, Objects.requireNonNull(danceRegistry), client.screen)
                 );
             }
         }
@@ -312,17 +313,26 @@ public class SpecialistDanceClient implements ClientModInitializer {
         dropLinks.entrySet().removeIf(
             entry -> now - entry.getValue().linkedAtMillis() > config.linkTimeoutMs
         );
+        triggeredOres.entrySet().removeIf(
+            entry -> now - entry.getValue() > config.linkTimeoutMs
+        );
 
         resolvePendingDrops(client, now);
     }
 
     private void resolvePendingDrops(Minecraft client, long now) {
+        ClientLevel level = client.level;
+
+        if (level == null) {
+            return;
+        }
+
         Iterator<Map.Entry<Integer, Long>> iterator =
             pendingDrops.entrySet().iterator();
 
         while (iterator.hasNext()) {
             Map.Entry<Integer, Long> entry = iterator.next();
-            Entity entity = client.level.getEntity(entry.getKey());
+            Entity entity = level.getEntity(entry.getKey());
 
             if (!(entity instanceof ItemEntity itemEntity)) {
                 iterator.remove();
@@ -355,10 +365,9 @@ public class SpecialistDanceClient implements ClientModInitializer {
                 continue;
             }
 
-            dropLinks.put(
-                itemEntity.getId(),
-                new DropLink(sourceOre, System.currentTimeMillis())
-            );
+            long linkedAt = System.currentTimeMillis();
+            dropLinks.put(itemEntity.getId(), new DropLink(sourceOre, linkedAt));
+            triggeredOres.computeIfPresent(sourceOre, (orePos, previous) -> linkedAt);
 
             log(
                 "Specialist Dance: linked drop "
@@ -369,7 +378,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
         }
     }
 
-    private BlockPos findSourceOre(BlockPos itemPos, Item droppedItem) {
+    private BlockPos findSourceOre(@NonNull BlockPos itemPos, Item droppedItem) {
         long now = System.currentTimeMillis();
         BlockPos best = null;
         double bestDistance = Double.MAX_VALUE;
@@ -385,7 +394,9 @@ public class SpecialistDanceClient implements ClientModInitializer {
                 continue;
             }
 
-            double distance = entry.getKey().distSqr(itemPos);
+            @NonNull Vec3i orePos = Objects.requireNonNull(entry.getKey());
+            @NonNull Vec3i itemPosition = itemPos;
+            double distance = orePos.distSqr(itemPosition);
 
             if (distance <= config.searchRadiusSquared && distance < bestDistance) {
                 bestDistance = distance;
@@ -403,7 +414,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
             return;
         }
 
-        if (triggeredOres.add(link.orePos())) {
+        if (triggeredOres.putIfAbsent(link.orePos(), System.currentTimeMillis()) == null) {
             log(
                 "Specialist Dance: activated for ore at " + link.orePos()
             );

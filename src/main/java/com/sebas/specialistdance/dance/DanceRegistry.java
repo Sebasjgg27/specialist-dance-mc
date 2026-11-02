@@ -168,14 +168,40 @@ public class DanceRegistry {
 
     private void discardInterruptedImports(Path root) {
         try (Stream<Path> dirs = Files.list(root)) {
-            dirs.filter(Files::isDirectory)
-                .filter(path -> {
-                    String name = path.getFileName().toString();
-                    return name.startsWith(".import-") || name.endsWith(".replaced");
-                })
-                .forEach(this::deleteRecursively);
+            dirs.filter(Files::isDirectory).forEach(path -> {
+                String name = path.getFileName().toString();
+
+                if (name.startsWith(".import-")) {
+                    deleteRecursively(path);
+                } else if (name.startsWith(".") && name.endsWith(".replaced")) {
+                    restoreInterruptedReplacement(root, path, name);
+                }
+            });
         } catch (IOException e) {
             log("could not clean interrupted imports in " + root);
+        }
+    }
+
+    private void restoreInterruptedReplacement(Path root, Path backup, String backupName) {
+        String name = backupName.substring(1, backupName.length() - ".replaced".length());
+
+        if (name.isBlank()) {
+            deleteRecursively(backup);
+            return;
+        }
+
+        Path target = root.resolve(name);
+
+        if (Files.exists(target)) {
+            deleteRecursively(backup);
+            return;
+        }
+
+        try {
+            Files.move(backup, target);
+            log("restored dance pack after interrupted GIF import: " + name);
+        } catch (IOException e) {
+            log("could not restore dance pack " + name + ": " + e.getMessage());
         }
     }
 
@@ -186,7 +212,7 @@ public class DanceRegistry {
             dirs.filter(Files::isDirectory)
                 .filter(dir -> !dir.getFileName().toString().startsWith("."))
                 .forEach(dir -> DancePackMeta.read(dir, config.debug)
-                    .map(DancePackMeta::source)
+                    .map(meta -> meta.source())
                     .ifPresent(source -> sources.putIfAbsent(source, dir.getFileName().toString())));
         } catch (IOException e) {
             log("could not index dance packs by source GIF");
@@ -197,7 +223,7 @@ public class DanceRegistry {
 
     private boolean isImportedPack(Path dir) {
         return DancePackMeta.read(dir, config.debug)
-            .map(DancePackMeta::source)
+            .map(meta -> meta.source())
             .isPresent();
     }
 

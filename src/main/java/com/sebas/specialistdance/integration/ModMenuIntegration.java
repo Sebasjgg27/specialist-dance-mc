@@ -1,5 +1,7 @@
 package com.sebas.specialistdance.integration;
 
+import java.util.Objects;
+
 import com.sebas.specialistdance.SpecialistDanceClient;
 import com.sebas.specialistdance.config.menu.SpecialistDanceConfigScreen;
 
@@ -20,7 +22,7 @@ public class ModMenuIntegration implements ModMenuApi {
             return new SpecialistDanceConfigScreen(
                 client.getConfig(),
                 client.getMusicManager(),
-                client.getDanceRegistry(),
+                Objects.requireNonNull(client.getDanceRegistry()),
                 parent
             );
         };

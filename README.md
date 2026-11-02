@@ -191,7 +191,8 @@ frame delay, and opens the **Position dance** editor for it. The folder it creat
 
 ## Settings screen
 
-Press **K** (with no other screen open) for: music on/off, volume, track selector,
+Press **K** (with no other screen open) to open the **Music**, **Dance**,
+**Animation** and **Content** tabs. The screen includes music on/off, volume, track selector,
 **Play preview** / **Stop**, the **Dance pack** selector, the **End behavior** selector,
 the **Animation speed** slider, **Preview dance on close**, **Position dance** (drag to
 move, scroll to zoom, **Center** /

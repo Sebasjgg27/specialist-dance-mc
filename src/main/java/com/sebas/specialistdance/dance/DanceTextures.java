@@ -10,6 +10,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import com.mojang.blaze3d.platform.NativeImage;
+import org.jspecify.annotations.NonNull;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -17,7 +18,7 @@ import net.minecraft.resources.Identifier;
 
 public class DanceTextures {
 
-    public record Frame(Identifier texture, int width, int height) {}
+    public record Frame(@NonNull Identifier texture, int width, int height) {}
 
     public record Placement(int x, int y, int width, int height, int stageX, int stageY, int stageWidth, int stageHeight) {
         public boolean contains(int mouseX, int mouseY) {
@@ -50,7 +51,7 @@ public class DanceTextures {
     private static final String NAMESPACE = "specialist-dance";
 
     private final Map<String, Frame> frames = new HashMap<>();
-    private final Set<Identifier> registered = new HashSet<>();
+    private final Set<@NonNull Identifier> registered = new HashSet<>();
 
     private String loadedPack;
 
@@ -109,7 +110,7 @@ public class DanceTextures {
 
         Identifier location = Identifier.fromNamespaceAndPath(
             NAMESPACE,
-            "dances/%s/%s".formatted(safeName, fileName)
+            Objects.requireNonNull("dances/%s/%s".formatted(safeName, fileName))
         );
 
         NativeImage image;
@@ -117,7 +118,7 @@ public class DanceTextures {
         int height;
 
         try (InputStream in = Files.newInputStream(dance.folder().resolve(fileName))) {
-            image = NativeImage.read(in);
+            image = NativeImage.read(Objects.requireNonNull(in));
             width = image.getWidth();
             height = image.getHeight();
 

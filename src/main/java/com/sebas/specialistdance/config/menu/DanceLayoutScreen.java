@@ -14,8 +14,12 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.client.input.MouseButtonEvent;
 
 import org.lwjgl.glfw.GLFW;
+import org.jspecify.annotations.NonNull;
 
 public class DanceLayoutScreen extends Screen {
+
+    private static final int BAR_HEIGHT = 30;
+
     private final SpecialistDanceConfig config;
     private final DanceRegistry danceRegistry;
     private final DanceTextures danceTextures;
@@ -34,8 +38,8 @@ public class DanceLayoutScreen extends Screen {
     protected void init() {
         int buttonWidth = 60;
         int buttonHeight = 20;
-        int y = this.height - buttonHeight - 10;
-        int startX = (this.width - (buttonWidth * 3 + 8)) / 2;
+        int y = this.height - BAR_HEIGHT + (BAR_HEIGHT - buttonHeight) / 2;
+        int startX = 8;
 
         addRenderableWidget(
             Button.builder(Component.literal("Center"), button -> {
@@ -65,13 +69,13 @@ public class DanceLayoutScreen extends Screen {
 
         addRenderableWidget(
             Button.builder(Component.literal("Done"), button -> onClose())
-                .bounds(this.width - buttonWidth - 8, 8, buttonWidth, buttonHeight)
+                .bounds(this.width - buttonWidth - 8, y, buttonWidth, buttonHeight)
                 .build()
         );
     }
 
     @Override 
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
+    public boolean mouseClicked(@NonNull MouseButtonEvent event, boolean doubleClick) {
         if (event.button() == GLFW.GLFW_MOUSE_BUTTON_LEFT && currentPlacement().contains((int) event.x(), (int) event.y())) {
             dragging = true;
             return true;
@@ -81,13 +85,13 @@ public class DanceLayoutScreen extends Screen {
     }
 
     @Override 
-    public boolean mouseReleased(MouseButtonEvent event) {
+    public boolean mouseReleased(@NonNull MouseButtonEvent event) {
         dragging = false;
         return super.mouseReleased(event);
     }
 
     @Override 
-    public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+    public boolean mouseDragged(@NonNull MouseButtonEvent event, double dragX, double dragY) {
         if (!dragging) {
             return super.mouseDragged(event, dragX, dragY);
         }
@@ -119,7 +123,14 @@ public class DanceLayoutScreen extends Screen {
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+    public void renderBackground(@NonNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        super.renderBackground(graphics, mouseX, mouseY, partialTick);
+
+        graphics.fill(0, 0, this.width, this.height, 0x60000000);
+    }
+
+    @Override
+    public void render(@NonNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         DanceTextures.Frame frame = currentFrame();
         DanceTextures.Placement placement = currentPlacement();
 
@@ -146,8 +157,7 @@ public class DanceLayoutScreen extends Screen {
             graphics.fill(placement.stageX() + placement.stageWidth(), placement.stageY(), placement.stageX() + placement.stageWidth() + 1, placement.stageY() + placement.stageHeight(), sc);
         }
 
-        int overlayY = this.height - 40;
-        graphics.fill(0, overlayY, this.width, this.height, 0x80000000);
+        graphics.fill(0, this.height - BAR_HEIGHT, this.width, this.height, 0x80000000);
 
         super.render(graphics, mouseX, mouseY, partialTick);
 

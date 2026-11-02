@@ -3,6 +3,7 @@ package com.sebas.specialistdance.mixin;
 import com.sebas.specialistdance.SpecialistDanceClient;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.protocol.game.ClientboundTakeItemEntityPacket;
 
@@ -23,12 +24,13 @@ public abstract class ClientPacketListenerMixin {
         CallbackInfo ci
     ) {
         Minecraft client = Minecraft.getInstance();
+        LocalPlayer player = client.player;
 
-        if (client.player == null || client.level == null) {
+        if (player == null || client.level == null) {
             return;
         }
 
-        if (packet.getPlayerId() != client.player.getId()) {
+        if (packet.getPlayerId() != player.getId()) {
             return;
         }
 

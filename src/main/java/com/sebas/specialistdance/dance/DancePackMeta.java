@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 
 import com.google.gson.Gson;
+import org.jspecify.annotations.Nullable;
 
 public final class DancePackMeta {
 
@@ -45,15 +46,15 @@ public final class DancePackMeta {
         }
 
         try (Reader reader = Files.newBufferedReader(file)) {
-            DancePackMeta meta = GSON.fromJson(reader, DancePackMeta.class);
+            @Nullable DancePackMeta parsedMeta = GSON.fromJson(reader, DancePackMeta.class);
 
-            if (meta == null) {
+            if (parsedMeta == null) {
                 log(debug, "pack.json for " + packDir.getFileName() + " is empty");
                 return Optional.empty();
             }
 
-            meta.sanitize();
-            return Optional.of(meta);
+            parsedMeta.sanitize();
+            return Optional.of(parsedMeta);
         } catch (IOException | RuntimeException e) {
             log(debug, "could not read pack.json for " + packDir.getFileName() + ": " + e.getMessage());
             return Optional.empty();
