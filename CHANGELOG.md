@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+Animation speed + config hardening + Mod Menu. The dance can be played faster or slower
+from the **K** menu; out-of-range config values are now clamped instead of trusted.
+
+- Added: `animationSpeed` config field and an **Animation speed** slider in the **K**
+  menu, from `0.1x` to `10.0x` — a GIF that imports too slow can be sped up without
+  touching its `pack.json`.
+- Added: `speedMultiplier` in `pack.json`, so one pack can carry its own playback speed.
+  It overrides the global slider rather than multiplying with it, matching how
+  `frameDurationMs` already overrides the global timing.
+- Added: `configVersion` in the config file, with a `migrate()` hook that runs on load.
+  A file written before the key existed is detected as version `0` and stamped current,
+  because Gson applies field initialisers before binding and would otherwise report a
+  v0 file as v1.
+- Added: every numeric config field now has an upper bound as well as a lower one, so a
+  stray extra zero (`frameDurationMs: 50000`) is clamped rather than hanging the trigger
+  pipeline; an `animationEndBehavior` outside `stop`/`hold`/`loop` falls back to `stop`.
+- Added: Mod Menu integration — `integration/ModMenuIntegration.java` opens the existing
+  settings screen from **Mods**, so the mod no longer depends on knowing the **K**
+  keybind. Mod Menu is only recommended, never required.
+- Changed: the trigger diagnostic logs the frame duration the animation actually uses
+  (after the speed multiplier) instead of the base duration, and also logs `speed`.
+- Changed: `SpecialistDanceConfig` moved from `com.sebas.specialistdance` to
+  `com.sebas.specialistdance.config`; the config file path is unchanged.
+- Changed: frame timing now rounds instead of truncating, and floors at 1 ms, so a fast
+  multiplier cannot divide a duration down to zero.
+- Note: none of the above has been observed in-game yet — see `ROADMAP.md` Phase 7.
+- Known: the **Animation speed** slider has no effect on a pack that declares its own
+  `speedMultiplier`.
+
 ## 1.5.0
 
 Animation control + dance packages. `animationEndBehavior` is no longer dead config, and raw GIFs can be imported directly in-game.

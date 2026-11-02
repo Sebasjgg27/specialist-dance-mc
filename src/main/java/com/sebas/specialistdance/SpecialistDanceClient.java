@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Set;
 
 import com.sebas.specialistdance.audio.MusicManager;
+import com.sebas.specialistdance.config.SpecialistDanceConfig;
 import com.sebas.specialistdance.config.menu.DanceLayoutScreen;
 import com.sebas.specialistdance.config.menu.SpecialistDanceConfigScreen;
 import com.sebas.specialistdance.dance.DanceRegistry;
@@ -79,6 +80,18 @@ public class SpecialistDanceClient implements ClientModInitializer {
 
     public static SpecialistDanceClient getInstance() {
         return instance;
+    }
+
+    public SpecialistDanceConfig getConfig() {
+        return config;
+    }
+
+    public MusicManager getMusicManager() {
+        return musicManager;
+    }
+
+    public DanceRegistry getDanceRegistry() {
+        return danceRegistry;
     }
 
     public DanceTextures getDanceTextures() {
@@ -172,8 +185,9 @@ public class SpecialistDanceClient implements ClientModInitializer {
                     endAnimation("invalid pack " + dance.name());
                     return;
                 }
-                int frameDurationMs = dance.frameDurationMs(config.frameDurationMs);
-                int frameIndex = (int) (elapsed / Math.max(1, frameDurationMs));
+
+                int frameDurationMs = effectiveFrameDurationMs(dance);
+                int frameIndex = (int) (elapsed / frameDurationMs);
 
                 String behavior = musicDrivesAnimationEnd ? config.animationEndBehavior : "stop";
 
@@ -242,6 +256,11 @@ public class SpecialistDanceClient implements ClientModInitializer {
         if (config.debug) {
             System.out.println(message);
         }
+    }
+
+    private int effectiveFrameDurationMs(DanceRegistry.Dance dance) {
+        double speedMultiplier = dance.speedMultiplier(config.animationSpeed);
+        return Math.max(1, Math.round((float) (dance.frameDurationMs(config.frameDurationMs) / speedMultiplier)));
     }
 
     private void endAnimation(String reason) {
@@ -490,7 +509,8 @@ public class SpecialistDanceClient implements ClientModInitializer {
             + " behavior=" + config.animationEndBehavior
             + " track=" + track
             + " musicEnabled=" + config.musicEnabled
-            + " frameDurationMs=" + dance.frameDurationMs(config.frameDurationMs)
+            + " frameDurationMs=" + effectiveFrameDurationMs(dance)
+            + " speed=" + dance.speedMultiplier(config.animationSpeed)
             + " drivesEnd=" + musicDrivesAnimationEnd);
     }
 }

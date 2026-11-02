@@ -16,9 +16,12 @@ public final class DancePackMeta {
     private static final Pattern SOURCE_HASH = Pattern.compile("[0-9a-f]{64}");
     private static final int MIN_FRAME_DURATION_MS = 10;
     private static final int MAX_FRAME_DURATION_MS = 10_000;
+    private static final double MIN_SPEED_MULTIPLIER = 0.1;
+    private static final double MAX_SPEED_MULTIPLIER = 10.0;
     private static final long MAX_BYTES = 1_000_000L;
 
     private int frameDurationMs = -1;
+    private double speedMultiplier = -1;
     private String track;
     private String source;
 
@@ -69,6 +72,10 @@ public final class DancePackMeta {
         return source;
     }
 
+    public double speedMultiplier() {
+        return speedMultiplier;
+    }
+
     private void sanitize() {
         if (frameDurationMs <= 0) {
             frameDurationMs = -1;
@@ -82,6 +89,12 @@ public final class DancePackMeta {
             if (track.isEmpty() || track.contains("..") || !TRACK_NAME.matcher(track).matches()) {
                 track = null;
             }
+        }
+
+        if (speedMultiplier <= 0) {
+            speedMultiplier = -1;
+        } else {
+            speedMultiplier = Math.clamp(speedMultiplier, MIN_SPEED_MULTIPLIER, MAX_SPEED_MULTIPLIER);
         }
 
         if (source != null && !SOURCE_HASH.matcher(source).matches()) {

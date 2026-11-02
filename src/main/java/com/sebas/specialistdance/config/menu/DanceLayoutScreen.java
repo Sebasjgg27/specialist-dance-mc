@@ -1,6 +1,6 @@
 package com.sebas.specialistdance.config.menu;
 
-import com.sebas.specialistdance.SpecialistDanceConfig;
+import com.sebas.specialistdance.config.SpecialistDanceConfig;
 import com.sebas.specialistdance.dance.DanceRegistry;
 import com.sebas.specialistdance.dance.DanceTextures;
 import com.sebas.specialistdance.dance.DanceTextures.Placement;

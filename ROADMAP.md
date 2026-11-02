@@ -3,8 +3,8 @@
 > Living document. Update it whenever a phase changes state.
 > If this file and the code disagree, the code wins and this file is wrong.
 
-**Latest release:** `v1.4.0` (2026-10-28) · **In verification:** `v1.5.0` (branch `v1.5.0`, untagged)
-**Branch:** `v1.5.0` · **History:** 20 commits, 2026-10-10 → 2026-10-30 (21 days)
+**Latest release:** `v1.5.0` (2026-11-01, tagged `79c3907`) · **In development:** `v1.6.0` Phase 7, uncommitted on `main`
+**Branch:** `main` · **History:** 23 commits, 2026-10-10 → 2026-11-01 (22 days)
 
 ## What this project is
 
@@ -34,18 +34,18 @@ config menu and user-supplied dance packs and tracks.
 | 4 | Sound On | 1.3.0 | 10-19 → 10-23 | 5 d | 5 | ✅ | 100% |
 | 4b | More Music Formats | 1.3.1 | 10-24 | 1 d | 1 | ✅ | 100% |
 | 5 | Dance Packs + Layout | 1.4.0 | 10-25 → 10-28 | 3 d | 9 | ✅ | 10/10 |
-| 6 | Animation Control | 1.5.0 | 10-30 | 1 d | 1 | 🧪 | 3/5 items 🧪 |
-| 6b | Dance Packages | TBD | 10-30 | 1 d | 0 | 🛠 | Plan A+B built, GIF drop-in 🧪 |
-| 7 | Solid Ground | 1.6.0 | — | — | — | ⬜ | 0% |
+| 6 | Animation Control | 1.5.0 | 10-30 → 11-01 | 2 d | 4 | ✅ | released |
+| 6b | Dance Packages | 1.5.0 | 10-30 → 11-01 | 2 d | 1 | ✅ | shipped inside v1.5.0 |
+| 7 | Solid Ground + Speed | 1.6.0 | 11-01 | 1 d | 0 | 🛠 | 4/4 items built, 0 observed |
 | 8 | Your Rules | 1.7.0 | — | — | — | ⬜ | 0% |
 | 9 | Provable | 1.8.0 | — | — | — | ⬜ | 0% |
 | 10 | Stability | 1.9.0 | — | — | — | ⬜ | 0% |
 | 11 | Final Mix | 2.0.0 | — | — | — | ⬜ | 0% |
 | 12 | The Control Room | 2.1.0 | — | — | — | ⬜ | 0% |
 
-**Overall: 14 phases · 6 released · 1 in verification · 1 built · 6 not started.**
+**Overall: 14 phases · 8 released across 7 tags · 1 built · 5 not started.**
 
-## Current reality (2026-10-30)
+## Current reality (2026-11-01)
 
 | Claim | State |
 |---|---|
@@ -60,6 +60,11 @@ config menu and user-supplied dance packs and tracks.
 | Per-pack `pack.json` timing / audio | 🛠 built; no client log yet shows a pack playing at its own delay or with its own track |
 | `animationEndBehavior` | 🧪 `stop` / `hold` / `loop` × music on and off all logged on 2026-10-30 (17:47, 18:08, 18:17) |
 | `cooldownMs` | 🛠 consumed in `triggerDance()`, never tested — only `cooldownMs: 0` has an observation |
+| `animationSpeed` slider changes playback rate | 🛠 built; the formula was checked offline in a throwaway runner, but no client log yet shows a dance running at a non-`1.0` speed |
+| `pack.json` `speedMultiplier` overrides the slider | 🛠 built; never observed |
+| Config clamps an out-of-range value on load | 🛠 built; no client log yet shows a clamped field or the `configVersion` upgrade |
+| Mod Menu opens the config screen | 🛠 built; `modRuntimeOnly` puts ModMenu on the dev classpath but no dev-client session has clicked the button |
+| Mod Menu is safe when `"enabled": false` | 🛠 the null guard is in `ModMenuIntegration`; the NPE it prevents has not been reproduced either way |
 | Automated tests | ⬜ none; `./gradlew test` is `NO-SOURCE` |
 | ModMenu entrypoint | ⬜ none |
 
@@ -154,11 +159,10 @@ config menu and user-supplied dance packs and tracks.
 - K menu: **Open music folder**, **Open dances folder**, **Rescan** (rows 6 → 9);
   `MusicManager.scanUserTracks()` and `SpecialistDanceClient.getDanceTextures()` opened up.
 
-## Phase 6 — v1.5.0: Animation Control 🧪
+## Phase 6 — v1.5.0: Animation Control ✅
 
-**Time:** 2026-10-30 · **Branch:** `v1.5.0`, untagged, unpushed.
-**Progress:** 3 of 5 items 🧪 · not ✅ until `cooldownMs` is observed at a non-zero value
-and the tag exists.
+**Time:** 2026-10-30 → 2026-11-01 (2 days) · **Commits:** `df4ad33..79c3907` · **Tag:** `v1.5.0` 2026-11-01
+**Progress:** released. `cooldownMs` shipped still unobserved — it stays in Open debt.
 
 - 🧪 `animationEndBehavior` consumers in the HUD: `stop` plays one pass then clears the
   overlay, `hold` keeps the last frame, `loop` wraps. The **K** menu selector offers these
@@ -178,11 +182,11 @@ and the tag exists.
   never reset on world change, and the no-audio-device path (`isPlaying()` false because
   OpenAL is unavailable) has no observation.
 
-## Phase 6b — Dance Packages 🛠
+## Phase 6b — Dance Packages ✅
 
-**Time:** 2026-10-30 · **Branch:** `v1.5.0` working tree, untagged, uncommitted.
-**Progress:** Plan A + B built; the raw-GIF path is 🧪. Version TBD — the plan scoped this
-as v1.6.0, but Phase 7 still owns that number until a release decision is made.
+**Time:** 2026-10-30 → 2026-11-01 (2 days) · **Commit:** `f735bf5` · **Tag:** shipped inside `v1.5.0` 2026-11-01
+**Progress:** released with Phase 6 as v1.5.0 rather than as its own version, so the
+`v1.6.0` number stayed with Phase 7. Items still 🛠 below are Open debt.
 
 - 🧪 `DanceRegistry.scan()` is add-aware and returns new pack names; startup and
   **Rescan** queue them; the **Position dance** editor opens once per pack and returns to
@@ -212,14 +216,40 @@ as v1.6.0, but Phase 7 still owns that number until a release decision is made.
 - ⬜ Zip/`.dancepack` import (plan Task 8) is not implemented.
 - ⬜ Per-pack layout still does not exist; the stage remains global.
 
-## Phase 7 — v1.6.0: Solid Ground ⬜
+## Phase 7 — v1.6.0: Solid Ground + Speed 🛠
 
-**Progress:** 0%. ModMenu placeholder screen dropped from the plan — a real editing screen
-already ships on **K**; ModMenu just opens it.
-- Validate and clamp every config value on load; fall back to defaults on nonsense.
-- Merge cleanly when new fields appear in an old file (no silent resets).
-- Repackage `SpecialistDanceConfig` into `com.sebas.specialistdance.config`.
-- ModMenu dependency + `ConfigMenuIntegration`.
+**Time:** 2026-11-01 · **Commits:** 0 (working tree on `main`) · **Tag:** none yet.
+**Progress:** 4/4 planned items built + one unscoped addition · 0 observed. ModMenu
+placeholder screen dropped from the plan — a real editing screen already ships on **K**;
+ModMenu just opens it.
+
+- 🛠 `sanitize()` now bounds every numeric field on both sides, not just the minimum:
+  `frameDurationMs` 10–10000, timeouts 100–60000, `cooldownMs` 0–60000,
+  `searchRadiusSquared` 0–100, `animationSpeed` 0.1–10.0. An `animationEndBehavior`
+  outside `stop`/`hold`/`loop` falls back to `stop`; the whitelist is one
+  `ANIMATION_END_BEHAVIORS` constant shared with the config screen instead of two copies.
+- 🛠 `configVersion` + `migrate()`. Gson runs field initialisers before binding, so a
+  pre-versioning file would read back as current; `load()` parses the raw `JsonObject`
+  first and treats a missing key as version `0`. `migrate()` runs after `sanitize()` so
+  the stamp that reaches `save()` holds clamped values.
+- 🛠 `SpecialistDanceConfig` moved to `com.sebas.specialistdance.config`; five import
+  sites updated, config file path unchanged.
+- 🛠 `integration/ModMenuIntegration` implements `ModMenuApi` and opens the existing
+  screen; ModMenu is `modCompileOnly` + `modRuntimeOnly` and only **recommends** in
+  `fabric.mod.json`, so it is never a hard dependency. The factory null-guards
+  `getMusicManager()` because `onInitializeClient()` returns early when
+  `"enabled": false`, before the manager exists — without the guard Mod Menu's Config
+  button throws an NPE in `init()`.
+- 🛠 **Animation speed** (not in the original Phase 7 scope, added on request): a
+  dropped GIF plays at its own delay and there was no way to change it, so
+  `animationSpeed` (global, on a **K** menu slider) and `speedMultiplier` (per pack) both
+  divide the frame duration. Timing uses `Math.round` and floors at 1 ms so a large
+  multiplier cannot divide a duration down to `0`. A pack's `speedMultiplier` overrides
+  the slider, matching the existing `frameDurationMs` precedent. The formula was checked
+  against 13 cases in a throwaway runner (1.0x/2.0x/10.0x, clamping a hand-authored
+  `1000`, the 1 ms floor, the `-1` no-override sentinel, slider round-trip and the
+  `0.1`/`10.0` endpoints); the runner was not committed, so this is reasoning, not
+  in-game evidence.
 
 ## Phase 8 — v1.7.0: Your Rules ⬜
 
@@ -304,6 +334,20 @@ Anything 🛠 at release time sits here until it is 🧪.
 - [ ] `tools/GifToFrames.java` still carries its own compositing copy. The runtime
       `GifImporter` duplicates it because the documented single-file launch on Java 21
       cannot import the mod class.
+- [ ] Phase 7 is entirely 🛠: no client log has shown a dance running at a non-`1.0`
+      `animationSpeed`, a pack's `speedMultiplier` taking effect, a config value being
+      clamped on load, or the `configVersion` upgrade of a pre-versioning file.
+- [ ] Mod Menu has never been clicked. `modRuntimeOnly` puts it on the dev classpath, so
+      the entrypoint and the `"enabled": false` null guard are both unexercised — the NPE
+      the guard prevents has never been reproduced either.
+- [ ] A pack's `speedMultiplier` overrides the **Animation speed** slider rather than
+      multiplying with it, so the slider silently does nothing for such a pack. The
+      semantics match `frameDurationMs` and are documented, but no user-facing control
+      shows which is in force.
+- [ ] `MIN/MAX_SPEED_MULTIPLIER` in `DancePackMeta` duplicate
+      `MIN/MAX_ANIMATION_SPEED` in `SpecialistDanceConfig` as literals rather than one
+      shared constant, to keep the `dance` package from depending on `config`. Changing
+      one without the other lets a pack speed escape the range the slider can reach.
 
 ## Out of scope / future ideas
 

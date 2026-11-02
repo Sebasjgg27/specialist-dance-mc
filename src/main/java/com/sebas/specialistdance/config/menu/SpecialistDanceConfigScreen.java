@@ -1,14 +1,15 @@
 package com.sebas.specialistdance.config.menu;
 
 import java.util.List;
+import java.util.Locale;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import net.fabricmc.loader.api.FabricLoader;
 
 import com.sebas.specialistdance.SpecialistDanceClient;
-import com.sebas.specialistdance.SpecialistDanceConfig;
 import com.sebas.specialistdance.audio.MusicManager;
+import com.sebas.specialistdance.config.SpecialistDanceConfig;
 import com.sebas.specialistdance.dance.DanceRegistry;
 
 import net.minecraft.client.gui.GuiGraphics;
@@ -24,9 +25,8 @@ public class SpecialistDanceConfigScreen extends Screen {
     private static final int BOX_WIDTH = 300;
     private static final int ROW_HEIGHT = 18;
     private static final int GAP = 2;
-    private static final int ROWS = 11;
+    private static final int ROWS = 12;
     private static final int TOP_Y = 30;
-    private static final int NOTE_HEIGHT = 12;
 
     private final SpecialistDanceConfig config;
     private final MusicManager music;
@@ -34,7 +34,8 @@ public class SpecialistDanceConfigScreen extends Screen {
     private final Screen parent;
 
     private boolean previewDance;
-    private int noteY;
+    private int scroll;
+    private int maxScroll;
 
     public SpecialistDanceConfigScreen(
             SpecialistDanceConfig config,
@@ -53,11 +54,13 @@ public class SpecialistDanceConfigScreen extends Screen {
         int contentHeight = ROWS * ROW_HEIGHT + (ROWS - 1) * GAP;
         int x = this.width / 2 - BOX_WIDTH / 2;
 
-        int doneY = this.height - ROW_HEIGHT - 20;
-        int row = Math.max(TOP_Y, (doneY - contentHeight - NOTE_HEIGHT) / 2);
+        int viewportBottom = this.height - 8;
+        int viewport = viewportBottom - TOP_Y;
 
-        doneY = Math.max(doneY, row + contentHeight + NOTE_HEIGHT + 6);
-        noteY = row + contentHeight + 3;
+        maxScroll = Math.max(0, contentHeight - viewport);
+        scroll = Math.max(0, Math.min(scroll, maxScroll));
+
+        int row = maxScroll == 0 ? Math.max(TOP_Y, (viewportBottom - contentHeight) / 2) : TOP_Y - scroll;
 
         addRenderableWidget(
             Checkbox.builder(Component.literal("Music Enabled"), this.font)
@@ -133,7 +136,7 @@ public class SpecialistDanceConfigScreen extends Screen {
 
         row += ROW_HEIGHT + GAP;
 
-        List<String> behaviors = List.of("stop", "hold", "loop");
+        List<String> behaviors = SpecialistDanceConfig.ANIMATION_END_BEHAVIORS;
 
         if (!behaviors.contains(config.animationEndBehavior)) {
             config.animationEndBehavior = "stop";
@@ -148,6 +151,10 @@ public class SpecialistDanceConfigScreen extends Screen {
                     (button, value) -> config.animationEndBehavior = value
                 )
         );
+
+        row += ROW_HEIGHT + GAP;
+
+        addRenderableWidget(new SpeedSlider(x, row, BOX_WIDTH, ROW_HEIGHT));
 
         row += ROW_HEIGHT + GAP;
 
@@ -231,11 +238,31 @@ public class SpecialistDanceConfigScreen extends Screen {
             .build()
         );
 
+        row += ROW_HEIGHT + GAP;
+
         addRenderableWidget(
             Button.builder(Component.literal("Done"), button -> onClose())
-                .bounds(this.width / 2 - 100, doneY, 200, ROW_HEIGHT)
+                .bounds(x, row, BOX_WIDTH, ROW_HEIGHT)
                 .build()
         );
+    }
+
+    @Override 
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (maxScroll == 0) {
+            return false;
+        }
+
+        int step = ROW_HEIGHT + GAP;
+        int clamped = Math.max(0, Math.min(scroll + (scrollY > 0 ? -step : step), maxScroll));
+
+        if (clamped == scroll) {
+            return true;
+        }
+
+        scroll = clamped;
+        rebuildWidgets();
+        return true;
     }
 
     @Override
@@ -248,14 +275,6 @@ public class SpecialistDanceConfigScreen extends Screen {
             this.width / 2,
             12,
             0xFFFFFFFF
-        );
-
-        graphics.drawCenteredString(
-            this.font,
-            Component.literal("Drop a GIF in dances, then Rescan - clean GIFs look best"),
-            this.width / 2,
-            noteY,
-            0xFFAAAAAA
         );
     }
 
@@ -291,6 +310,30 @@ public class SpecialistDanceConfigScreen extends Screen {
             config.musicVolume = (float) value;
             updateMessage();
             music.applyVolume();
+        }
+    }
+
+    private class SpeedSlider extends AbstractSliderButton {
+
+        private static final double SPEED_RANGE = SpecialistDanceConfig.MAX_ANIMATION_SPEED
+            - SpecialistDanceConfig.MIN_ANIMATION_SPEED;
+
+        SpeedSlider(int x, int y, int width, int height) {
+            super(x, y, width, height, Component.literal("Speed"),
+                Math.clamp((config.animationSpeed - SpecialistDanceConfig.MIN_ANIMATION_SPEED) / SPEED_RANGE, 0.0, 1.0));
+            updateMessage();
+        }
+
+        @Override
+        protected void updateMessage() {
+            setMessage(Component.literal("Animation speed: "
+                + String.format(Locale.ROOT, "%.1f", config.animationSpeed) + "x"));
+        }
+
+        @Override
+        protected void applyValue() {
+            config.animationSpeed = SpecialistDanceConfig.MIN_ANIMATION_SPEED + value * SPEED_RANGE;
+            updateMessage();
         }
     }
 }

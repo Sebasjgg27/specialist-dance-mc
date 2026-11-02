@@ -5,3 +5,4 @@ bin/
 run/
 extract_gif.py
 *.log
+.qoder/repowiki/

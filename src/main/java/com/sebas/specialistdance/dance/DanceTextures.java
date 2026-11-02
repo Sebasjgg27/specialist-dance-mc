@@ -61,17 +61,13 @@ public class DanceTextures {
         }
 
         String key = dance.name() + '/' + index;
-        Frame cached = frames.get(key);
 
-        if (cached != null) {
-            return cached;
+        if (frames.containsKey(key)) {
+            return frames.get(key);
         }
 
         Frame frame = load(client, dance, index);
-
-        if (frame != null) {
-            frames.put(key, frame);
-        }
+        frames.put(key, frame);
 
         return frame;
     }
@@ -136,7 +132,7 @@ public class DanceTextures {
                 new DynamicTexture(() -> location.toString(), image)
             );
         } catch (IOException | RuntimeException e) {
-            log("could not load frame" + fileName + " from " + dance.name() + ": " + e.getMessage());
+            log("could not load frame " + fileName + " from " + dance.name() + ": " + e.getMessage());
             return null;
         }
 

@@ -28,7 +28,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import com.sebas.specialistdance.SpecialistDanceConfig;
+import com.sebas.specialistdance.config.SpecialistDanceConfig;
 
 public class DanceRegistry {
 
@@ -52,6 +52,12 @@ public class DanceRegistry {
 
         public String track() {
             return meta == null ? null : meta.track();
+        }
+
+        public double speedMultiplier(double fallback) {
+            return meta != null && meta.speedMultiplier() > 0
+                ? meta.speedMultiplier()
+                : fallback;
         }
     }
 

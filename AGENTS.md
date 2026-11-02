@@ -36,11 +36,15 @@ If builds fail with a connection error to port 8765, the mirror is not running. 
 ## Layout
 
 - `src/main/java/com/sebas/specialistdance/SpecialistDanceClient.java` — entrypoint, keybind, detection pipeline, tick cleanup, HUD animation.
-- `src/main/java/com/sebas/specialistdance/SpecialistDanceConfig.java` — Gson config, defaults, `save()`/`load()`.
+- `src/main/java/com/sebas/specialistdance/config/SpecialistDanceConfig.java` — Gson config, defaults, `save()`/`load()`, `sanitize()`/`migrate()`.
 - `src/main/java/com/sebas/specialistdance/audio/MusicManager.java` — OpenAL/STBVorbis music playback.
-- `src/main/java/com/sebas/specialistdance/dance/DanceRegistry.java` — scans `config/specialist-dance/dances/<pack>/` for `frame_NNN.png` packs; the bundled dance is `specialist`.
+- `src/main/java/com/sebas/specialistdance/dance/DanceRegistry.java` — scans `config/specialist-dance/dances/<pack>/` for `frame_NNN.png` packs, imports dropped GIFs, dedupes by SHA-256; the bundled dance is `specialist`.
+- `src/main/java/com/sebas/specialistdance/dance/DancePackMeta.java` — reads a pack's `pack.json` (`frameDurationMs`, `speedMultiplier`, `track`, `source`).
+- `src/main/java/com/sebas/specialistdance/dance/GifImporter.java` — composites a dropped `.gif` into a `frame_NNN.png` pack at runtime.
 - `src/main/java/com/sebas/specialistdance/dance/DanceTextures.java` — loads pack frames as `DynamicTexture`s and caches per-frame dimensions.
-- `src/main/java/com/sebas/specialistdance/config/menu/SpecialistDanceConfigScreen.java` — music config screen (keybind `K`).
+- `src/main/java/com/sebas/specialistdance/config/menu/SpecialistDanceConfigScreen.java` — config screen (keybind `K`).
+- `src/main/java/com/sebas/specialistdance/config/menu/DanceLayoutScreen.java` — **Position dance** editor: drag to move, scroll to zoom.
+- `src/main/java/com/sebas/specialistdance/integration/ModMenuIntegration.java` — ModMenu entrypoint that opens the config screen.
 - `src/main/java/com/sebas/specialistdance/mixin/ClientPacketListenerMixin.java` — player pickup detection.
 - `src/main/resources/` — `fabric.mod.json`, mixin config, lang files, animation frames, bundled `sounds/default.ogg`.
 - `tools/` — dev-only, never shipped: `loom-mirror.sh` (metadata mirror) and `GifToFrames.java` (`java tools/GifToFrames.java <in.gif> <out-dir> [maxSize]` exports a GIF into a `frame_%03d.png` dance pack).
@@ -84,6 +88,18 @@ If builds fail with a connection error to port 8765, the mirror is not running. 
 
 - `handleTakeItemEntity` must be injected at `RETURN`: it hops threads at the start, so `HEAD` fires twice.
 - Item entities arrive with an empty stack; the stack is filled by a later `SetEntityData` packet, so linking happens on the client tick.
+
+### Config
+
+- Gson runs the field initialisers **before** binding JSON keys, so a field defaulting to `CURRENT_VERSION` reads back as current even from a file written before versioning existed. `load()` therefore parses the raw `JsonObject` first and treats a missing `configVersion` key as version `0`.
+- `migrate()` runs **after** `sanitize()`, so the version stamp that eventually reaches `save()` holds clamped values, not the raw ones from disk.
+- A `pack.json` number that means "no override" uses the `-1` sentinel (`frameDurationMs`, `speedMultiplier`), not `null` and not `0` — `"frameDurationMs": 0` and `"speedMultiplier": 0` must both fall back to the global, and `0` would otherwise clamp to the slowest legal speed.
+- A pack's `speedMultiplier` **overrides** the global **Animation speed** slider rather than multiplying with it, matching the `frameDurationMs` precedent. A user whose slider "does nothing" is playing a pack that declares its own speed.
+
+### ModMenu
+
+- `onInitializeClient()` returns early when `config.enabled` is false, **before** `musicManager` is constructed. `getModConfigScreenFactory()` must null-guard `getMusicManager()` too, or Mod Menu's Config button throws an NPE in `init()`; returning `null` is Mod Menu's "no config screen" signal.
+- `modCompileOnly` keeps ModMenu off the dev runtime classpath, so the entrypoint is dead code in `runClient`. `modRuntimeOnly` is also declared so the integration is actually exercisable in the dev client without shipping ModMenu as a dependency.
 
 ## Release process
 

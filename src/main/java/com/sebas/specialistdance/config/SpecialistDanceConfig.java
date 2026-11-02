@@ -1,4 +1,4 @@
-package com.sebas.specialistdance;
+package com.sebas.specialistdance.config;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -10,22 +10,32 @@ import java.util.stream.Stream;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import net.fabricmc.loader.api.FabricLoader;
 
 public class SpecialistDanceConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path PATH  = FabricLoader.getInstance().getConfigDir().resolve("specialist-dance.json");
+    private static final int CURRENT_VERSION = 1;
+
+    public static final List<String> ANIMATION_END_BEHAVIORS = List.of("stop", "hold", "loop");
+    public static final double MIN_ANIMATION_SPEED = 0.1;
+    public static final double MAX_ANIMATION_SPEED = 10.0;
+
+    public int configVersion = CURRENT_VERSION;
 
     public boolean enabled = true;
     public boolean debug = false;
 
     public int oreTimeoutMs = 10_000;
+    public double animationSpeed = 1.0;
     public int linkTimeoutMs = 30_000;
     public double searchRadiusSquared = 16.0;
     public int dropResolveTimeoutMs = 2_000;
 
-    public int frameDurationMs = 50;
+    public int frameDurationMs = 100;
     public int drawSize = 160;
     public int stageWidth = 200;
     public int stageHeight = 150;
@@ -49,10 +59,18 @@ public class SpecialistDanceConfig {
             if (Files.exists(PATH)) {
                 try {
                     String json = Files.readString(PATH);
-                    SpecialistDanceConfig config = GSON.fromJson(json, SpecialistDanceConfig.class);
+                    JsonObject raw = JsonParser.parseString(json).getAsJsonObject();
+                    SpecialistDanceConfig config = GSON.fromJson(raw, SpecialistDanceConfig.class);
 
                     if (config != null) {
+                        // Gson runs the field initialisers before binding, so a file written
+                        // before versioning exists still reads back as CURRENT_VERSION.
+                        if (!raw.has("configVersion")) {
+                            config.configVersion = 0;
+                        }
+
                         config.sanitize();
+                        config.migrate();
 
                         if (!config.seenDancesSeeded) {
                             seedSeenDances(config);
@@ -108,21 +126,28 @@ public class SpecialistDanceConfig {
         } catch (IOException ignored) {}
     }
 
+    private void migrate() {
+        if (configVersion < CURRENT_VERSION) {
+            configVersion = CURRENT_VERSION;
+        }
+    }
+
     private void sanitize() {
-        frameDurationMs = Math.max(10, frameDurationMs);
-        drawSize = Math.max(16, drawSize);
-        stageWidth = Math.max(16, stageWidth);
-        stageHeight = Math.max(16, stageHeight);
+        frameDurationMs = Math.clamp(frameDurationMs, 10, 10_000);
+        drawSize = Math.clamp(drawSize, 16, 2000);
+        stageWidth = Math.clamp(stageWidth, 16, 4000);
+        stageHeight = Math.clamp(stageHeight, 16, 4000);
         stageWidthPercent = Math.clamp(stageWidthPercent, 1, 100);
         stageHeightPercent = Math.clamp(stageHeightPercent, 1, 100);
         positionX = positionX < 0 ? -1 : positionX;
         positionY = positionY < 0 ? -1 : positionY;
-        cooldownMs = Math.max(0, cooldownMs);
-        oreTimeoutMs = Math.max(100, oreTimeoutMs);
-        linkTimeoutMs = Math.max(100, linkTimeoutMs);
-        dropResolveTimeoutMs = Math.max(100, dropResolveTimeoutMs);
-        searchRadiusSquared = Math.max(0.0, searchRadiusSquared);
+        cooldownMs = Math.clamp(cooldownMs, 0, 60000);
+        oreTimeoutMs = Math.clamp(oreTimeoutMs, 100, 60000);
+        linkTimeoutMs = Math.clamp(linkTimeoutMs, 100, 60000);
+        dropResolveTimeoutMs = Math.clamp(dropResolveTimeoutMs, 100, 60000);
+        searchRadiusSquared = Math.clamp(searchRadiusSquared, 0.0, 100.0);
         musicVolume = Math.clamp(musicVolume, 0.0f, 1.0f);
+        animationSpeed = Math.clamp(animationSpeed, MIN_ANIMATION_SPEED, MAX_ANIMATION_SPEED);
 
         if (musicTrack == null) {
             musicTrack = "default";
@@ -144,6 +169,10 @@ public class SpecialistDanceConfig {
 
         if ("loop-until-music-ends".equals(animationEndBehavior)) {
             animationEndBehavior = "loop";
+        }
+
+        if (!ANIMATION_END_BEHAVIORS.contains(animationEndBehavior)) {
+            animationEndBehavior = "stop";
         }
     }
     

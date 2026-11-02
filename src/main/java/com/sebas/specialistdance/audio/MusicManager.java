@@ -35,7 +35,7 @@ import org.lwjgl.stb.STBVorbis;
 import org.lwjgl.stb.STBVorbisInfo;
 import org.lwjgl.system.MemoryUtil;
 
-import com.sebas.specialistdance.SpecialistDanceConfig;
+import com.sebas.specialistdance.config.SpecialistDanceConfig;
 
 import net.fabricmc.loader.api.FabricLoader;
 

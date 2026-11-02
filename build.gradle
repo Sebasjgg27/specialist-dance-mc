@@ -16,6 +16,10 @@ loom {
 
 repositories {
     mavenCentral()
+    maven {
+        name = "Terraformers"
+        url = "https://maven.terraformersmc.com/"
+    }
 }
 
 base {
@@ -28,6 +32,8 @@ dependencies {
 
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+    modCompileOnly "com.terraformersmc:modmenu:${project.modmenu_version}"
+    modRuntimeOnly "com.terraformersmc:modmenu:${project.modmenu_version}"
 
     implementation "com.tianscar.javasound:javasound-mp3:1.9.8"
     implementation "com.tianscar.javasound:javasound-flac:1.4.1"

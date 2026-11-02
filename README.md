@@ -74,6 +74,7 @@ Missing keys fall back to defaults and are added back to the file automatically.
 | `searchRadiusSquared` | `16.0` | Max distance (squared blocks) from drop to ore — `16` = 4 blocks. |
 | `dropResolveTimeoutMs` | `2000` | How long to wait for an item entity to receive its item data. |
 | `frameDurationMs` | `50` | Milliseconds per animation frame. |
+| `animationSpeed` | `1.0` | Playback multiplier applied to every dance: `2.0` plays twice as fast, `0.5` half speed. Clamped to `0.1`–`10.0`. A pack that sets its own `speedMultiplier` overrides this. |
 | `stageWidthPercent` | `35` | Share of the screen width the dance stage may use; each frame is scaled to fit inside it. |
 | `stageHeightPercent` | `33` | Share of the screen height the dance stage may use. |
 | `positionX` | `-1` | X of the stage's top-left; `-1` centres it horizontally. |
@@ -84,6 +85,7 @@ Missing keys fall back to defaults and are added back to the file automatically.
 | `musicTrack` | `"default"` | Track name: `default` or a custom filename without its extension. |
 | `animationEndBehavior` | `"stop"` | What happens when the frames run out: `stop` clears the dance, `hold` keeps the last frame, `loop` repeats until the music ends. An unknown value falls back to `stop`. With music off there is no end signal, so `hold` and `loop` both play exactly one pass. |
 | `activeDance` | `"specialist"` | Dance to play: `specialist` (bundled) or a folder name from the dances folder. |
+| `configVersion` | `1` | Schema stamp for the file. A file written before this key existed is detected as version `0` and upgraded on load; you do not need to touch it. |
 
 `drawSize`, `stageWidth` and `stageHeight` are still written to the file, but nothing
 reads them: since `v1.4.0` the stage is sized from the percentages above and each frame
@@ -156,17 +158,20 @@ frame delay, and opens the **Position dance** editor for it. The folder it creat
   as a dance, and a GIF with its own background paints an opaque box over the game.
 - You can still add a folder of PNG frames by hand. Frames must be numbered from `000`
   with no gaps.
-- `pack.json` is optional and can override the GIF delay or choose a track:
+- `pack.json` is optional and can override the GIF delay, the playback speed or the track:
 
   ```json
   {
     "frameDurationMs": 100,
+    "speedMultiplier": 2.0,
     "track": "mydance"
   }
   ```
 
-  `frameDurationMs` is clamped to 10–10000 ms. An invalid value falls back to the
-  global `frameDurationMs`.
+  `frameDurationMs` is clamped to 10–10000 ms and `speedMultiplier` to 0.1–10.0. An
+  invalid or missing `speedMultiplier` leaves the pack on the global
+  `animationSpeed` from the **K** menu; a valid one wins over that slider, so a pack
+  that sets its own speed ignores what you drag the slider to.
 - To give a pack its own music, put an audio file next to the frames (or next to the
   GIF before importing) with the same name:
 
@@ -188,9 +193,13 @@ frame delay, and opens the **Position dance** editor for it. The folder it creat
 
 Press **K** (with no other screen open) for: music on/off, volume, track selector,
 **Play preview** / **Stop**, the **Dance pack** selector, the **End behavior** selector,
-**Preview dance on close**, **Position dance** (drag to move, scroll to zoom, **Center** /
+the **Animation speed** slider, **Preview dance on close**, **Position dance** (drag to
+move, scroll to zoom, **Center** /
 **Fit** / **reset**), **Open music folder** and **Open dances folder**, **Rescan** and
 **Done**. Everything is written to `specialist-dance.json` when the screen closes.
+
+If [Mod Menu](https://modrinth.com/mod/modmenu) is installed, the same screen opens from
+**Mods → Specialist Dance → Config**; the **K** keybind still works either way.
 
 **Preview dance on close** starts the animation as the screen shuts: the HUD paints
 behind any open screen, so a preview could not be seen from inside the menu.
@@ -269,14 +278,17 @@ manifest.
 
 - `SpecialistDanceClient.java` — entry point, detection pipeline, tick cleanup
   and HUD animation.
-- `SpecialistDanceConfig.java` — the JSON config model.
+- `config/SpecialistDanceConfig.java` — the JSON config model.
 - `audio/MusicManager.java` — music scanning, decoding, playback and
   lifecycle.
 - `dance/DanceRegistry.java` — bundled dance plus user packs, per-pack frame count.
+- `dance/DancePackMeta.java` — reads a pack's `pack.json` overrides.
+- `dance/GifImporter.java` — converts a dropped GIF into a frame pack at runtime.
 - `dance/DanceTextures.java` — loads pack frames as dynamic textures and places them.
 - `config/menu/SpecialistDanceConfigScreen.java` — music and mod settings
   screen.
 - `config/menu/DanceLayoutScreen.java` — drag/zoom position editor (working tree).
+- `integration/ModMenuIntegration.java` — opens the settings screen from Mod Menu.
 - `mixin/ClientPacketListenerMixin.java` — reports pickups of the local
   player.
 - `assets/specialist-dance/` — icon, bundled music and the 147 animation
