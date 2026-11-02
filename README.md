@@ -37,7 +37,7 @@ villager, or walking over loot someone else dropped does **not**.
 ## Tracked ores
 
 | Ore | Drop |
-|---|---|
+| --- | --- |
 | Diamond Ore / Deepslate Diamond Ore | Diamond |
 | Emerald Ore / Deepslate Emerald Ore | Emerald |
 | Gold Ore / Deepslate Gold Ore | Raw Gold |
@@ -66,7 +66,7 @@ A config file is created on first launch:
 Missing keys fall back to defaults and are added back to the file automatically.
 
 | Setting | Default | What it does |
-|---|---|---|
+| --- | --- | --- |
 | `enabled` | `true` | Turn the whole mod on or off. |
 | `debug` | `false` | Log the detection and music pipeline to the console. |
 | `oreTimeoutMs` | `10000` | How long a broken ore can still claim a drop. |
@@ -225,7 +225,7 @@ their own.
 Run in **Survival** — Creative mining drops nothing.
 
 | Scenario | Expected |
-|---|---|
+| --- | --- |
 | Mine and collect a tracked ore | Three log lines (with `debug`) + dance + music |
 | Break dirt or stone | Nothing |
 | Open a chest / trade / grab old ground loot | Nothing |
