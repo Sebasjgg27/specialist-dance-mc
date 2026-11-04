@@ -22,6 +22,7 @@ import net.minecraft.world.item.ItemStack;
 public class OreTriggersScreen extends Screen {
     private static final int PANE_TOP = 34;
     private static final int ROW_HEIGHT = 20;
+    private enum RuleType { BLOCK, PICKUP }
 
     private final SpecialistDanceConfig config;
     private final Screen parent;
@@ -93,6 +94,20 @@ public class OreTriggersScreen extends Screen {
         );
 
         addRenderableWidget(
+            Button.builder(Component.literal("Add pickup"), button -> {
+                if (config.addPickupRule(dropText)) {
+                    dropText = "";
+                    notice = null;
+                    rebuildWidgets();
+                } else {
+                    notice = "item id must look like minecraft:golden_axe";
+                }
+            })
+                .bounds(listX + 140, actionTop, 76, 18)
+                .build()
+        );
+
+        addRenderableWidget(
             Button.builder(Component.literal("Reset"), button -> {
                 config.resetRules();
                 blockText = "";
@@ -100,7 +115,7 @@ public class OreTriggersScreen extends Screen {
                 notice = null;
                 rebuildWidgets();
             })
-                .bounds(listX + 80, actionTop, 56, 18)
+                .bounds(listX + 220, actionTop, 56, 18)
                 .build()
         );
 
@@ -128,7 +143,7 @@ public class OreTriggersScreen extends Screen {
 
         graphics.drawCenteredString(this.font, this.title, this.width / 2, 16, 0xFFFFFFFF);
 
-        String hint = config.blockRules.isEmpty()
+        String hint = config.blockRules.isEmpty() && config.pickupRules.isEmpty()
             ? "No rules yet - add one below"
             : "Left-click toggles · right-click deletes · saved on close";
 
@@ -154,35 +169,52 @@ public class OreTriggersScreen extends Screen {
     }
 
     private class OreEntry extends ObjectSelectionList.Entry<OreEntry> {
-        private final String blockId;
+        private final RuleType type;
+        private final @Nullable String blockId;
         private final String dropId;
         private final Font font;
 
-        OreEntry(String blockId, String dropId, Font font) {
+        OreEntry(RuleType type, @Nullable String blockId, String dropId, Font font) {
+            this.type = type;
             this.blockId = blockId;
             this.dropId = dropId;
             this.font = font;
         }
 
-        String blockId() {
-            return blockId;
+        RuleType type() {
+            return type;
+        }
+
+        String key() {
+            return type == RuleType.BLOCK ? blockId : dropId;
         }
 
         boolean enabled() {
-            return !config.disabledBlockRules.contains(blockId);
+            if (type == RuleType.BLOCK) {
+                return !config.disabledBlockRules.contains(blockId);
+            }
+            return !config.disabledPickupRules.contains(dropId);
         }
 
         void toggle() {
-            if (enabled()) {
-                config.disabledBlockRules.add(blockId);
+            if (type == RuleType.BLOCK) {
+                if (enabled()) {
+                    config.disabledBlockRules.add(blockId);
+                } else {
+                    config.disabledBlockRules.remove(blockId);
+                }
             } else {
-                config.disabledBlockRules.remove(blockId);
+                if (enabled()) {
+                    config.disabledPickupRules.add(dropId);
+                } else {
+                    config.disabledPickupRules.remove(dropId);
+                }
             }
         }
 
         @Override
         public @NonNull Component getNarration() {
-            return Component.literal(blockId);
+            return Component.literal(key());
         }
 
         @Override
@@ -200,32 +232,51 @@ public class OreTriggersScreen extends Screen {
             graphics.drawString(font, check, getContentX(), textY, color);
 
             int x = getContentX() + font.width(check);
-            ItemStack mined = ItemGridScreen.stackOf(blockId);
 
-            if (!mined.isEmpty()) {
-                graphics.renderItem(mined, x, iconY);
-                x += 18;
-            }
+            if (type == RuleType.BLOCK) {
+                ItemStack mined = ItemGridScreen.stackOf(blockId);
 
-            graphics.drawString(font, blockId, x, textY, color);
+                if (!mined.isEmpty()) {
+                    graphics.renderItem(mined, x, iconY);
+                    x += 18;
+                }
 
-            int nameEnd = x + font.width(blockId);
-            ItemStack drop = ItemGridScreen.stackOf(dropId);
-            int dropTextX = getContentRight() - font.width(dropId);
-            int dropIconX = dropTextX - 18;
+                graphics.drawString(font, blockId, x, textY, color);
 
-            if (dropIconX <= nameEnd + 4) {
-                return;
-            }
+                int nameEnd = x + font.width(blockId);
+                ItemStack drop = ItemGridScreen.stackOf(dropId);
+                int dropTextX = getContentRight() - font.width(dropId);
+                int dropIconX = dropTextX - 18;
 
-            if (!drop.isEmpty()) {
-                graphics.renderItem(drop, dropIconX, iconY);
-            }
+                if (dropIconX <= nameEnd + 4) {
+                    return;
+                }
 
-            graphics.drawString(font, dropId, dropTextX, textY, 0xFF909090);
+                if (!drop.isEmpty()) {
+                    graphics.renderItem(drop, dropIconX, iconY);
+                }
 
-            if (isMouseOver && !drop.isEmpty()) {
-                graphics.setTooltipForNextFrame(font, drop, mouseX, mouseY);
+                graphics.drawString(font, dropId, dropTextX, textY, 0xFF909090);
+
+                if (isMouseOver && !drop.isEmpty()) {
+                    graphics.setTooltipForNextFrame(font, drop, mouseX, mouseY);
+                }
+            } else {
+                graphics.drawString(font, "pickup ", x, textY, 0xFF909090);
+                x += font.width("pickup ");
+
+                ItemStack item = ItemGridScreen.stackOf(dropId);
+
+                if (!item.isEmpty()) {
+                    graphics.renderItem(item, x, iconY);
+                    x += 18;
+                }
+
+                graphics.drawString(font, dropId, x, textY, color);
+
+                if (isMouseOver && !item.isEmpty()) {
+                    graphics.setTooltipForNextFrame(font, item, mouseX, mouseY);
+                }
             }
         }
     }
@@ -236,7 +287,11 @@ public class OreTriggersScreen extends Screen {
             super(minecraft, width, height, x, y);
 
             for (String blockId : List.copyOf(config.blockRules.keySet())) {
-                addEntry(new OreEntry(blockId, config.blockRules.get(blockId), font), ROW_HEIGHT);
+                addEntry(new OreEntry(RuleType.BLOCK, blockId, config.blockRules.get(blockId), font), ROW_HEIGHT);
+            }
+
+            for (String itemId : List.copyOf(config.pickupRules)) {
+                addEntry(new OreEntry(RuleType.PICKUP, null, itemId, font), ROW_HEIGHT);
             }
         }
 
@@ -250,7 +305,11 @@ public class OreTriggersScreen extends Screen {
             }
 
             if (entry != null && event.button() == 1) {
-                if (config.removeBlockRule(entry.blockId())) {
+                boolean removed = entry.type() == RuleType.BLOCK
+                    ? config.removeBlockRule(entry.blockId)
+                    : config.removePickupRule(entry.dropId);
+
+                if (removed) {
                     notice = null;
                     rebuildWidgets();
                 }
