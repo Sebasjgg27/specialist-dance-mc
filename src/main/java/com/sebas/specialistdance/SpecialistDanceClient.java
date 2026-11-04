@@ -32,27 +32,17 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
 
 import org.lwjgl.glfw.GLFW;
 
 public class SpecialistDanceClient implements ClientModInitializer {
-
-    private static final List<Item> TRACKED_ITEMS = List.of(
-        Items.DIAMOND,
-        Items.EMERALD,
-        Items.RAW_GOLD,
-        Items.RAW_IRON,
-        Items.GOLD_NUGGET,
-        Items.ANCIENT_DEBRIS
-    );
 
     private SpecialistDanceConfig config;
     private MusicManager musicManager;
@@ -352,10 +342,6 @@ public class SpecialistDanceClient implements ClientModInitializer {
 
             Item droppedItem = stack.getItem();
 
-            if (!TRACKED_ITEMS.contains(droppedItem)) {
-                continue;
-            }
-
             BlockPos sourceOre = findSourceOre(
                 itemEntity.blockPosition(),
                 droppedItem
@@ -470,25 +456,38 @@ public class SpecialistDanceClient implements ClientModInitializer {
     }
 
     private Item expectedDrop(Block block) {
-        if (block == Blocks.DIAMOND_ORE || block == Blocks.DEEPSLATE_DIAMOND_ORE) {
-            return Items.DIAMOND;
+        Identifier blockId = BuiltInRegistries.BLOCK.getKey(block);
+
+        if (blockId == null || config.oreDrops == null) {
+            return null;
         }
-        if (block == Blocks.EMERALD_ORE || block == Blocks.DEEPSLATE_EMERALD_ORE) {
-            return Items.EMERALD;
+
+        String oreId = blockId.toString();
+
+        if (config.disabledOres != null && config.disabledOres.contains(oreId)) {
+            return null;
         }
-        if (block == Blocks.GOLD_ORE || block == Blocks.DEEPSLATE_GOLD_ORE) {
-            return Items.RAW_GOLD;
+
+        String dropId = config.oreDrops.get(oreId);
+
+        if (dropId == null) {
+            return null;
         }
-        if (block == Blocks.NETHER_GOLD_ORE) {
-            return Items.GOLD_NUGGET;
+
+        Identifier dropKey = Identifier.tryParse(dropId);
+
+        if (dropKey == null) {
+            log("Specialist Dance: ore " + oreId + " has invalid drop id " + dropId);
+            return null;
         }
-        if (block == Blocks.IRON_ORE || block == Blocks.DEEPSLATE_IRON_ORE) {
-            return Items.RAW_IRON;
+
+        Item item = BuiltInRegistries.ITEM.getValue(dropKey);
+
+        if (item == null) {
+            log("Specialist Dance: ore " + oreId + " points at unknown item " + dropId);
         }
-        if (block == Blocks.ANCIENT_DEBRIS) {
-            return Items.ANCIENT_DEBRIS;
-        }
-        return null;
+
+        return item;
     }
 
     public void triggerDance() {

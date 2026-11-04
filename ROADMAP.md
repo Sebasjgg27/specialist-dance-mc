@@ -3,8 +3,8 @@
 > Living document. Update it whenever a phase changes state.
 > If this file and the code disagree, the code wins and this file is wrong.
 
-**Latest release:** `v1.5.0` (2026-11-01, tagged `79c3907`) · **In development:** `v1.6.0` Phase 7, uncommitted on `main`
-**Branch:** `main` · **History:** 23 commits, 2026-10-10 → 2026-11-01 (22 days)
+**Latest release:** `v1.5.0` (2026-11-01, tagged `79c3907`) · **In development:** `v1.6.0` Phase 7, on branch `v1.6.0`
+**Branch:** `v1.6.0` · **History:** 26 commits, 2026-10-10 → 2026-11-02 (23 days)
 
 ## What this project is
 
@@ -36,20 +36,23 @@ config menu and user-supplied dance packs and tracks.
 | 5 | Dance Packs + Layout | 1.4.0 | 10-25 → 10-28 | 3 d | 9 | ✅ | 10/10 |
 | 6 | Animation Control | 1.5.0 | 10-30 → 11-01 | 2 d | 4 | ✅ | released |
 | 6b | Dance Packages | 1.5.0 | 10-30 → 11-01 | 2 d | 1 | ✅ | shipped inside v1.5.0 |
-| 7 | Solid Ground + Speed | 1.6.0 | 11-01 | 1 d | 0 | 🛠 | 4/4 items built, 0 observed |
-| 8 | Your Rules | 1.7.0 | — | — | — | ⬜ | 0% |
+| 7 | Solid Ground + Speed | 1.6.0 | 11-01 → 11-02 | 2 d | 3 | 🛠 | 4/4 built + two-pane menu, 0 observed |
+| 8 | Your Rules | 1.7.0 | 11-02 | 1 d | 0 | 🛠 | 3/3 built + authoring UI, uncommitted on `v1.6.0` |
 | 9 | Provable | 1.8.0 | — | — | — | ⬜ | 0% |
 | 10 | Stability | 1.9.0 | — | — | — | ⬜ | 0% |
 | 11 | Final Mix | 2.0.0 | — | — | — | ⬜ | 0% |
 | 12 | The Control Room | 2.1.0 | — | — | — | ⬜ | 0% |
 
-**Overall: 14 phases · 8 released across 7 tags · 1 built · 5 not started.**
+**Overall: 14 phases · 8 released across 7 tags · 2 built · 4 not started.**
 
-## Current reality (2026-11-01)
+## Current reality (2026-11-02)
 
 | Claim | State |
 |---|---|
 | Ore → drop → dance trigger path | 🧪 diamond / deepslate diamond only (`run/logs/latest.log` 20:55:32) |
+| Configurable ore → drop map | 🛠 Phase 8 work, uncommitted on `v1.6.0`: `config.oreDrops` + `disabledOres` are read by `expectedDrop()` (`SpecialistDanceClient.java:458`); no log yet shows a custom id firing or a disabled ore staying silent |
+| Per-rule editor | 🛠 `config/menu/OreTriggersScreen` (**Rules** pane → **Your rules**): toggle, add, right-click delete, reset, item icons and a creative-style `ItemGridScreen` picker. Compiles into `build/libs/specialist-dance-1.5.0.jar`; never opened in-game |
+| Two-pane **K** menu | 🛠 sidebar + scrollable file lists + live dance preview (`SpecialistDanceConfigScreen`); no screenshot or log observation of a pane switch |
 | Bundled `specialist` dance renders | ✅ shipped since v1.0.0 |
 | Music plays with the dance, all formats | ✅ released v1.3.0 / v1.3.1 |
 | Config screen edits and persists | 🧪 `musicTrack`, volume and `activeDance` all observed reaching disk (`run/config/specialist-dance.json`, 2026-10-30 18:17) |
@@ -66,7 +69,7 @@ config menu and user-supplied dance packs and tracks.
 | Mod Menu opens the config screen | 🛠 built; `modRuntimeOnly` puts ModMenu on the dev classpath but no dev-client session has clicked the button |
 | Mod Menu is safe when `"enabled": false` | 🛠 the null guard is in `ModMenuIntegration`; the NPE it prevents has not been reproduced either way |
 | Automated tests | ⬜ none; `./gradlew test` is `NO-SOURCE` |
-| ModMenu entrypoint | ⬜ none |
+| ModMenu entrypoint | 🛠 `integration/ModMenuIntegration` ships in `feec132`; registered under the `"modmenu"` entrypoint in `src/main/resources/fabric.mod.json:21` |
 
 ---
 
@@ -218,10 +221,11 @@ config menu and user-supplied dance packs and tracks.
 
 ## Phase 7 — v1.6.0: Solid Ground + Speed 🛠
 
-**Time:** 2026-11-01 · **Commits:** 0 (working tree on `main`) · **Tag:** none yet.
-**Progress:** 4/4 planned items built + one unscoped addition · 0 observed. ModMenu
-placeholder screen dropped from the plan — a real editing screen already ships on **K**;
-ModMenu just opens it.
+**Time:** 2026-11-01 → 2026-11-02 · **Commits:** 3 (`feec132` `42ac322` `4fa8aef`) on branch `v1.6.0`, plus an
+uncommitted working tree · **Tag:** none yet.
+**Progress:** 4/4 planned items built, plus a two-pane menu rework and the ore system pulled
+forward from Phase 8 · 0 observed. The ModMenu placeholder screen dropped from the plan — a real
+editing screen already ships on **K**; ModMenu just opens it.
 
 - 🛠 `sanitize()` now bounds every numeric field on both sides, not just the minimum:
   `frameDurationMs` 10–10000, timeouts 100–60000, `cooldownMs` 0–60000,
@@ -250,13 +254,71 @@ ModMenu just opens it.
   `1000`, the 1 ms floor, the `-1` no-override sentinel, slider round-trip and the
   `0.1`/`10.0` endpoints); the runner was not committed, so this is reasoning, not
   in-game evidence.
+- 🛠 **K menu rework** (unscoped, added on request after a Mod Menu screenshot): the screen is
+  two panes — a sidebar of `Music`, `Dance`, `Animation`, `Rules`, `Content` and one pane of rows.
+  `Button` exposes no selection state, so the sidebar is `drawString` text hit-tested in
+  `mouseClicked`, with a `fill` divider and a `>` marker for the active row. Rows stack from a
+  computed cursor and **Done** is pinned at `paneBottom`.
+- 🛠 Track and pack pickers are now scrollable `ObjectSelectionList`s (`NameList`,
+  `DanceNameListEntry`) showing the real files in `config/specialist-dance/music` and `.../dances`
+  in the space the old **Music track** `CycleButton` row occupied; that duplicate row is deleted and
+  the saved-track revalidation moved ahead of the list build. `addEntry` is `protected`, so entries
+  are built inside the list subclass, and `ObjectSelectionList.Entry.mouseClicked` consumes the
+  vanilla click without selecting, so the list overrides it.
+- 🛠 The **Dance** pane previews the selected pack live (`drawDancePreview`) through
+  `effectiveFrameDurationMs(dance)` — promoted from `private` in `SpecialistDanceClient` so the HUD
+  and the menu cannot drift apart on frame timing.
+- 🛠 Both **K** and **Position dance** screens paint a translucent black background from a
+  `renderBackground` override (`0x60000000` tint, `0x80000000` pane): `Screen.render` draws only
+  renderables and the vanilla background is painted *before* it, so a `fill` placed in `render`
+  sits behind the panel. **Position dance** also moves **Done** into the bottom bar with
+  Center / Fit / reset so nothing floats over the stage.
 
-## Phase 8 — v1.7.0: Your Rules ⬜
+## Phase 8 — v1.7.0: Your Rules 🛠
 
-**Progress:** 0%
-- Move the hardcoded ore → drop map from `expectedDrop()` into config, defaults = today.
-- Per-ore enable/disable toggles; trigger logic stays independent of animation and audio.
-- (Stretch) celebration counter per ore type.
+**Time:** 2026-11-02 → · **Commits:** none — the work sits uncommitted on the `v1.6.0` branch.
+**Progress:** 3/3 planned items built, plus an authoring UI · 0 observed.
+
+- 🛠 The hardcoded ore → drop map left `expectedDrop()`. `config.oreDrops` (`Map<String, String>`
+  of block id → item id) is now the source, seeded by `defaultOreDrops()` with the same ten entries
+  the old `if`-chain covered (`diamond_ore`, `deepslate_diamond_ore`, `emerald_ore`,
+  `deepslate_emerald_ore`, `gold_ore` → `raw_gold`, `deepslate_gold_ore`, `nether_gold_ore` →
+  `gold_nugget`, `iron_ore` → `raw_iron`, `deepslate_iron_ore`, `ancient_debris`). The parallel
+  `TRACKED_ITEMS` list is gone: the pickup loop no longer filters against a fixed item set, it asks
+  the ore what drop to expect.
+- 🛠 Per-ore toggles: `config.disabledOres` is checked in `expectedDrop()` before the drop lookup
+  (`SpecialistDanceClient.java:467`), so a disabled ore never registers a source and the animation
+  and audio paths are untouched — the trigger stays independent of both. `resetOres()` restores both
+  maps. Edited in `config/menu/OreTriggersScreen`, opened from the **Rules** pane as **Your rules**
+  (`SpecialistDanceConfigScreen.java:41` renames the `Ores` category and `:236` the button label);
+  the screen saves on close.
+- 🛠 The toggle list became a rule editor: rows are `[x]/[ ]` + the mined block's **item icon** + its
+  id, right-aligned drop icon + id with a hover tooltip, and the whole drop side is skipped on a row
+  too narrow to fit both texts rather than overprinting them. `addRule(block, drop)` (`SpecialistDanceConfig.java:200`) and `removeRule(block)`
+  (`:215`) are the write paths — left-click toggles, right-click deletes and rebuilds, **Add rule**
+  and **Reset** sit in a footer anchored to `Done` so the pane never floats off-screen. Two `EditBox`
+  es take ids by hand; `ItemGridScreen` is the alternative: a paged creative-style grid over
+  `BuiltInRegistries.ITEM.keySet()` with a filter box (`minecraft:diamond_ore` or `diamond`), scroll
+  to page, click returns the id through a callback.
+- 🛠 Config hardening for the new fields: `CURRENT_VERSION` 1 → 2, `normalizeOreId()` trims,
+  lowercases, defaults a bare path to the `minecraft` namespace and rejects anything outside
+  `[a-z0-9_.-]` / `[a-z0-9/.-]`; `sanitize()` drops invalid keys, dedupes collisions and sets a
+  transient `dirty` flag, and `load()` now rewrites the file when `dirty` is set or the version
+  stamp moved — previously it saved only for the `seenDances` seed.
+- ⬜ (Stretch) celebration counter per ore type — not started.
+
+**Open decision (rule 6):** this landed on the `v1.6.0` branch, and rule 1 is one phase per release.
+Either `v1.6.0` ships without these files (they stay uncommitted and are retargeted at `v1.7.0`) or
+Phase 7 and Phase 8 release together and `v1.7.0` is dropped.
+
+**Unverified edge:** `BuiltInRegistries.ITEM` is a *defaulted* registry
+(`DefaultedMappedRegistry.getValue` falls back to `defaultValue`, proven by bytecode), so an
+`oreDrops` value naming a nonexistent item resolves to `minecraft:air` instead of `null`. The
+`points at unknown item` log in `expectedDrop()` is probably unreachable; the harmless outcome is no
+trigger, because no item entity carries air. The editor absorbs the same quirk silently:
+`ItemStack.isEmpty()` is `this == EMPTY || item == Items.AIR || count <= 0` (verified in the mapped
+jar), so a bad id prints its text with **no icon** rather than a stone placeholder. Not observed
+either way.
 
 ## Phase 9 — v1.8.0: Provable ⬜
 
@@ -287,7 +349,9 @@ ModMenu just opens it.
 before this; what remains is the glue.
 - Music playback behavior on dance start/end; duration and end-of-animation behavior.
 - "Open folder" + in-screen preview (folder buttons are already in the tree for 1.4.0).
-- Live-synced ore toggles; save/restore/reset; mod version info; keybind remapping for K.
+- Live-synced ore toggles (the toggles, the reset and the save-on-close all ship in Phase 8; what
+  is left is the menu redrawing while the world keeps running); mod version info; keybind
+  remapping for K.
 
 ---
 
@@ -337,6 +401,20 @@ Anything 🛠 at release time sits here until it is 🧪.
 - [ ] Phase 7 is entirely 🛠: no client log has shown a dance running at a non-`1.0`
       `animationSpeed`, a pack's `speedMultiplier` taking effect, a config value being
       clamped on load, or the `configVersion` upgrade of a pre-versioning file.
+- [ ] The two-pane **K** menu has no observation: switching panes, clicking a row in the track or
+      pack list, the live dance preview and the **Your rules** screen have never been seen in a
+      running client. The sidebar hit-test uses integer division on `event.y() - sidebarTop`, so a
+      click above the sidebar needs a check at short window heights.
+- [ ] Phase 8's rule system is entirely 🛠: no log shows a custom `oreDrops` entry firing, a
+      `disabledOres` entry suppressing a trigger, `normalizeOreId()` rejecting a hand-authored bad
+      id, or `resetOres()` reaching disk. Neither has the editor: no observation of a row icon, a
+      **Drop** grid click filling a box, **Add rule** appending a row, a right-click delete or the
+      `dirty`-flag rewrite in `load()`. Only diamond / deepslate diamond have ever triggered, and
+      the nine other default entries — iron, gold, nether gold, ancient debris and the deepslate
+      variants — are newly *reachable* now that `TRACKED_ITEMS` no longer gates the pickup loop.
+      The footer only clears **Done** at logical height ≥ 158 (checked offline in
+      `/tmp/rules-layout/RulesLayoutCheck.java`, 0 grid failures, overlap failures confined to
+      heights 100–157), so a tiny window is the one layout case left unproven in-game.
 - [ ] Mod Menu has never been clicked. `modRuntimeOnly` puts it on the dev classpath, so
       the entrypoint and the `"enabled": false` null guard are both unexercised — the NPE
       the guard prevents has never been reproduced either.

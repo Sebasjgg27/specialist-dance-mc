@@ -5,8 +5,15 @@ import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -18,7 +25,11 @@ import net.fabricmc.loader.api.FabricLoader;
 public class SpecialistDanceConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path PATH  = FabricLoader.getInstance().getConfigDir().resolve("specialist-dance.json");
-    private static final int CURRENT_VERSION = 1;
+    private static final int CURRENT_VERSION = 2;
+
+    private static final Pattern ORE_NAMESPACE = Pattern.compile("[a-z0-9_.-]+");
+    private static final Pattern ORE_PATH = Pattern.compile("[a-z0-9/.-]+");
+    private transient boolean dirty;
 
     public static final List<String> ANIMATION_END_BEHAVIORS = List.of("stop", "hold", "loop");
     public static final double MIN_ANIMATION_SPEED = 0.1;
@@ -34,6 +45,9 @@ public class SpecialistDanceConfig {
     public int linkTimeoutMs = 30_000;
     public double searchRadiusSquared = 16.0;
     public int dropResolveTimeoutMs = 2_000;
+
+    public Map<String, String> oreDrops = defaultOreDrops();
+    public List<String> disabledOres = new ArrayList<>();
 
     public int frameDurationMs = 100;
     public int drawSize = 160;
@@ -69,12 +83,20 @@ public class SpecialistDanceConfig {
                             config.configVersion = 0;
                         }
 
+                        int versionBeforeMigrate = config.configVersion;
                         config.sanitize();
                         config.migrate();
+
+                        boolean needsSave = config.dirty
+                            || config.configVersion != versionBeforeMigrate;
 
                         if (!config.seenDancesSeeded) {
                             seedSeenDances(config);
                             config.seenDancesSeeded = true;
+                            needsSave = true;
+                        }
+
+                        if (needsSave) {
                             config.save();
                         }
 
@@ -126,10 +148,80 @@ public class SpecialistDanceConfig {
         } catch (IOException ignored) {}
     }
 
+    private static Map<String, String> defaultOreDrops() {
+        Map<String, String> drops = new LinkedHashMap<>();
+        drops.put("minecraft:diamond_ore", "minecraft:diamond");
+        drops.put("minecraft:deepslate_diamond_ore", "minecraft:diamond");
+        drops.put("minecraft:emerald_ore", "minecraft:emerald");
+        drops.put("minecraft:deepslate_emerald_ore", "minecraft:emerald");
+        drops.put("minecraft:gold_ore", "minecraft:raw_gold");
+        drops.put("minecraft:deepslate_gold_ore", "minecraft:raw_gold");
+        drops.put("minecraft:nether_gold_ore", "minecraft:gold_nugget");
+        drops.put("minecraft:iron_ore", "minecraft:raw_iron");
+        drops.put("minecraft:deepslate_iron_ore", "minecraft:raw_iron");
+        drops.put("minecraft:ancient_debris", "minecraft:ancient_debris");
+        return drops;
+    }
+
+    static @Nullable String normalizeOreId(@Nullable String raw) {
+        if (raw == null) {
+            return null;
+        }
+
+        String id = raw.trim().toLowerCase(Locale.ROOT);
+
+        if (id.isEmpty()) {
+            return null;
+        }
+
+        int separator = id.indexOf(':');
+        String namespace = separator < 0 ? "minecraft" : id.substring(0, separator);
+        String path = separator < 0 ? id : id.substring(separator + 1);
+
+        if (!ORE_NAMESPACE.matcher(namespace).matches() || !ORE_PATH.matcher(path).matches()) {
+            return null;
+        }
+
+        return namespace + ":" + path;
+    }
+
     private void migrate() {
         if (configVersion < CURRENT_VERSION) {
             configVersion = CURRENT_VERSION;
         }
+    }
+
+    public void resetOres() {
+        oreDrops = defaultOreDrops();
+        disabledOres = new ArrayList<>();
+        dirty = true;
+    }
+
+    public boolean addRule(@Nullable String rawBlock, @Nullable String rawDrop) {
+        String blockId = normalizeOreId(rawBlock);
+        String dropId = normalizeOreId(rawDrop);
+
+        if (blockId == null || dropId == null) {
+            return false;
+        }
+
+        oreDrops.put(blockId, dropId);
+        disabledOres.remove(blockId);
+        dirty = true;
+
+        return true;
+    }
+
+    public boolean removeRule(@Nullable String rawBlock) {
+        String blockId = normalizeOreId(rawBlock);
+
+        if (blockId == null || oreDrops.remove(blockId) == null) {
+            return false;
+        }
+        disabledOres.remove(blockId);
+        dirty = true;
+
+        return true;
     }
 
     private void sanitize() {
@@ -162,6 +254,61 @@ public class SpecialistDanceConfig {
         }
 
         seenDances.removeIf(name -> name == null || name.isBlank());
+
+        if (oreDrops == null) {
+            oreDrops = defaultOreDrops();
+            dirty = true;
+        } else {
+            Map<String, String> normalizedDrops = new LinkedHashMap<>();
+
+            for (Map.Entry<String, String> entry : oreDrops.entrySet()) {
+                String key = normalizeOreId(entry.getKey());
+                String value = normalizeOreId(entry.getValue());
+
+                if (key == null || value == null) {
+                    dirty = true;
+                    continue;
+                }
+
+                if (!key.equals(entry.getKey()) || !value.equals(entry.getValue())) {
+                    dirty = true;
+                }
+
+                if (normalizedDrops.put(key, value) != null) {
+                    dirty = true;
+                }
+            }
+
+            if (!normalizedDrops.equals(oreDrops)) {
+                oreDrops = normalizedDrops;
+                dirty = true;
+            }
+        }
+
+        if (disabledOres == null) {
+            disabledOres = new ArrayList<>();
+            dirty = true;
+        } else {
+            Set<String> normalizedDisabled = new LinkedHashSet<>();
+
+            for (String id : disabledOres) {
+                String normalized = normalizeOreId(id);
+
+                if (normalized == null) {
+                    dirty = true;
+                    continue;
+                }
+
+                if (!normalizedDisabled.add(normalized)) {
+                    dirty = true;
+                }
+            }
+
+            if (!new ArrayList<>(normalizedDisabled).equals(disabledOres)) {
+                disabledOres = new ArrayList<>(normalizedDisabled);
+                dirty = true;
+            }
+        }
 
         if (animationEndBehavior == null) {
             animationEndBehavior = "stop";

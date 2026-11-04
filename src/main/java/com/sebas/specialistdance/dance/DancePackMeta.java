@@ -46,7 +46,7 @@ public final class DancePackMeta {
         }
 
         try (Reader reader = Files.newBufferedReader(file)) {
-            @Nullable DancePackMeta parsedMeta = parsePackMeta(reader);
+            @Nullable DancePackMeta parsedMeta = GSON.fromJson(reader, DancePackMeta.class);
 
             if (parsedMeta == null) {
                 log(debug, "pack.json for " + packDir.getFileName() + " is empty");
@@ -59,10 +59,6 @@ public final class DancePackMeta {
             log(debug, "could not read pack.json for " + packDir.getFileName() + ": " + e.getMessage());
             return Optional.empty();
         }
-    }
-
-    private static @Nullable DancePackMeta parsePackMeta(Reader reader) {
-        return GSON.fromJson(reader, DancePackMeta.class);
     }
 
     public int frameDurationMs() {

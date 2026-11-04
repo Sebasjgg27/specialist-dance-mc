@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Client-only Fabric mod for Minecraft 1.21.11. It plays a 147-frame dance overlay when the player picks up a drop from an ore they just mined, with optional music and an in-game config screen.
+Client-only Fabric mod for Minecraft 1.21.11. It plays a 147-frame dance overlay when the player picks up a drop from an ore they just mined, with optional music and an in-game config screen.tu madre tu padre, tu abuela, to tataraner
 
 ## Working style: review and debug first
 
@@ -44,6 +44,8 @@ If builds fail with a connection error to port 8765, the mirror is not running. 
 - `src/main/java/com/sebas/specialistdance/dance/DanceTextures.java` — loads pack frames as `DynamicTexture`s and caches per-frame dimensions.
 - `src/main/java/com/sebas/specialistdance/config/menu/SpecialistDanceConfigScreen.java` — config screen (keybind `K`).
 - `src/main/java/com/sebas/specialistdance/config/menu/DanceLayoutScreen.java` — **Position dance** editor: drag to move, scroll to zoom.
+- `src/main/java/com/sebas/specialistdance/config/menu/OreTriggersScreen.java` — **Your rules** editor: toggle, add, delete and reset the `oreDrops` block → item map, with item icons per row.
+- `src/main/java/com/sebas/specialistdance/config/menu/ItemGridScreen.java` — creative-style item picker over `BuiltInRegistries.ITEM`: filter box, paged icon grid, returns the chosen id through a callback.
 - `src/main/java/com/sebas/specialistdance/integration/ModMenuIntegration.java` — ModMenu entrypoint that opens the config screen.
 - `src/main/java/com/sebas/specialistdance/mixin/ClientPacketListenerMixin.java` — player pickup detection.
 - `src/main/resources/` — `fabric.mod.json`, mixin config, lang files, animation frames, bundled `sounds/default.ogg`.
@@ -78,6 +80,11 @@ If builds fail with a connection error to port 8765, the mirror is not running. 
 - Re-validate the saved track and dance names before building their `CycleButton`s (a deleted user track or pack would otherwise fail).
 - `GuiGraphics.blit`'s last two ints are **UV divisors**, not a target size: pass the texture's real dimensions and put the scaled size in the `width`/`height` args, otherwise the image is cropped or squashed.
 - The config screen stacks its rows with a computed cursor (`ROWS`/`GAP`) and pushes `doneY` below the block. Anchoring rows at `height / 4` makes the last row collide with `Done` at the dev window's 240 logical pixels.
+- `ObjectSelectionList` in 1.21.11 has **no** item-height constructor argument — the only ctor is `(Minecraft, width, height, x, y)`. Row height comes from `protected int addEntry(E entry, int height)`; the 1-arg overload uses the entry's own measurement.
+- A tooltip set inside a list row's `renderContent` does appear: `Screen.renderWithTooltipAndSubtitles` calls `GuiGraphics.renderDeferredElements()` *after* `render`. `setTooltipForNextFrame` is therefore safe per-row, but only for the hovered row.
+- Snapshot registries in the **constructor**, never in `init()`: `init()` re-runs on every resize and would rebuild (and re-sort) the whole id list. `ItemGridScreen` fills `allIds` in its ctor and only recomputes columns/rows in `init()`.
+- Returning to a screen **re-runs `init()`**: `Minecraft.setScreen` calls `Screen.added()` then `init(width, height)` on whatever screen it installs, including the parent you came back from (verified in bytecode). That is why picking an id in `ItemGridScreen` appears in `OreTriggersScreen`'s `EditBox` — the boxes are rebuilt from the fields. Keep edits in fields, never in widget state.
+- `BuiltInRegistries.ITEM` is a *defaulted* registry: `getValue` returns `minecraft:air` for an unknown id instead of `null`. Check `ItemStack.isEmpty()` (or the id) rather than trusting a null test.
 
 ### Dance frames
 

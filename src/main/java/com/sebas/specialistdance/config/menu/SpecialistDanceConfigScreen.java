@@ -38,7 +38,7 @@ public class SpecialistDanceConfigScreen extends Screen {
     private static final int GAP = 2;
     private static final int TOP_Y = 32;
 
-    private static final List<String> CATEGORIES = List.of("Music", "Dance", "Animation", "Content");
+    private static final List<String> CATEGORIES = List.of("Music", "Dance", "Animation", "Rules", "Content");
     private static final Function<@NonNull String, Component> STRING_COMPONENT = Component::literal;
 
     private final SpecialistDanceConfig config;
@@ -92,6 +92,7 @@ public class SpecialistDanceConfigScreen extends Screen {
             case 0 -> addMusicRows(row);
             case 1 -> addDanceRows(row);
             case 2 -> addAnimationRows(row);
+            case 3 -> addOreRows(row);
             default -> addContentRows(row);
         }
 
@@ -104,14 +105,21 @@ public class SpecialistDanceConfigScreen extends Screen {
 
     private int rowsFor(int index) {
         return switch (index) {
-            case 0 -> 4;
+            case 0 -> 3;
             case 1 -> 3;
             case 2 -> 2;
+            case 3 -> 1;
             default -> 2;
         };
     }
 
     private void addMusicRows(int row) {
+        List<String> tracks = music.getAvailableTracks();
+
+        if (!tracks.contains(config.musicTrack)) {
+            config.musicTrack = tracks.get(0);
+        }
+
         addRenderableWidget(
             Checkbox.builder(Component.literal("Music Enabled"), this.font)
                 .pos(contentX, row)
@@ -128,7 +136,7 @@ public class SpecialistDanceConfigScreen extends Screen {
         addRenderableWidget(
             new NameList(
                 contentX, rowsBottom + GAP, contentWidth, listBottom - rowsBottom - GAP,
-                music.getAvailableTracks(), config.musicTrack,
+                tracks, config.musicTrack,
                 name -> config.musicTrack = name,
                 false
             )
@@ -143,24 +151,6 @@ public class SpecialistDanceConfigScreen extends Screen {
         row += ROW_HEIGHT + GAP;
 
         addRenderableWidget(new VolumeSlider(contentX, row, contentWidth, ROW_HEIGHT));
-
-        row += ROW_HEIGHT + GAP;
-
-        List<String> tracks = music.getAvailableTracks();
-
-        if (!tracks.contains(config.musicTrack)) {
-            config.musicTrack = tracks.get(0);
-        }
-
-        addRenderableWidget(
-            CycleButton.<String>builder(STRING_COMPONENT, requireString(config.musicTrack))
-                .withValues(tracks)
-                .create(
-                    contentX, row, contentWidth, ROW_HEIGHT,
-                    Component.literal("Music track"),
-                    (button, value) -> config.musicTrack = value
-                )
-        );
 
         row += ROW_HEIGHT + GAP;
 
@@ -239,6 +229,15 @@ public class SpecialistDanceConfigScreen extends Screen {
         row += ROW_HEIGHT + GAP;
 
         addRenderableWidget(new SpeedSlider(contentX, row, contentWidth, ROW_HEIGHT));
+    }
+
+    private void addOreRows(int row) {
+        addRenderableWidget(
+            Button.builder(Component.literal("Your rules"), button ->
+                minecraft.setScreen(new OreTriggersScreen(config, this)))
+                .bounds(contentX, row, contentWidth, ROW_HEIGHT)
+                .build()
+        );
     }
 
     private void addContentRows(int row) {
