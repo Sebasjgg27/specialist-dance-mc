@@ -19,13 +19,14 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.reflect.TypeToken;
 
 import net.fabricmc.loader.api.FabricLoader;
 
 public class SpecialistDanceConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path PATH  = FabricLoader.getInstance().getConfigDir().resolve("specialist-dance.json");
-    private static final int CURRENT_VERSION = 2;
+    private static final int CURRENT_VERSION = 3;
 
     private static final Pattern ORE_NAMESPACE = Pattern.compile("[a-z0-9_.-]+");
     private static final Pattern ORE_PATH = Pattern.compile("[a-z0-9/.-]+");
@@ -46,8 +47,10 @@ public class SpecialistDanceConfig {
     public double searchRadiusSquared = 16.0;
     public int dropResolveTimeoutMs = 2_000;
 
-    public Map<String, String> oreDrops = defaultOreDrops();
-    public List<String> disabledOres = new ArrayList<>();
+    public Map<String, String> blockRules = defaultBlockRules();
+    public List<String> pickupRules = new ArrayList<>();
+    public List<String> disabledBlockRules = new ArrayList<>();
+    public List<String> disabledPickupRules = new ArrayList<>();
 
     public int frameDurationMs = 100;
     public int drawSize = 160;
@@ -81,6 +84,24 @@ public class SpecialistDanceConfig {
                         // before versioning exists still reads back as CURRENT_VERSION.
                         if (!raw.has("configVersion")) {
                             config.configVersion = 0;
+                        }
+
+                        // Migrate oreDrops → blockRules (v2 → v3 rename)
+                        if (raw.has("oreDrops") && !raw.has("blockRules")) {
+                            config.blockRules = GSON.fromJson(
+                                raw.getAsJsonObject("oreDrops"),
+                                new com.google.gson.reflect.TypeToken<Map<String, String>>() {}.getType()
+                            );
+                            config.dirty = true;
+                        }
+
+                        // Migrate disabledOres → disabledBlockRules (v2 → v3 rename)
+                        if (raw.has("disabledOres") && !raw.has("disabledBlockRules")) {
+                            config.disabledBlockRules = GSON.fromJson(
+                                raw.getAsJsonArray("disabledOres"),
+                                new com.google.gson.reflect.TypeToken<List<String>>() {}.getType()
+                            );
+                            config.dirty = true;
                         }
 
                         int versionBeforeMigrate = config.configVersion;
@@ -148,7 +169,7 @@ public class SpecialistDanceConfig {
         } catch (IOException ignored) {}
     }
 
-    private static Map<String, String> defaultOreDrops() {
+    private static Map<String, String> defaultBlockRules() {
         Map<String, String> drops = new LinkedHashMap<>();
         drops.put("minecraft:diamond_ore", "minecraft:diamond");
         drops.put("minecraft:deepslate_diamond_ore", "minecraft:diamond");
@@ -191,13 +212,15 @@ public class SpecialistDanceConfig {
         }
     }
 
-    public void resetOres() {
-        oreDrops = defaultOreDrops();
-        disabledOres = new ArrayList<>();
+    public void resetRules() {
+        blockRules = defaultBlockRules();
+        pickupRules = new ArrayList<>();
+        disabledBlockRules = new ArrayList<>();
+        disabledPickupRules = new ArrayList<>();
         dirty = true;
     }
 
-    public boolean addRule(@Nullable String rawBlock, @Nullable String rawDrop) {
+    public boolean addBlockRule(@Nullable String rawBlock, @Nullable String rawDrop) {
         String blockId = normalizeOreId(rawBlock);
         String dropId = normalizeOreId(rawDrop);
 
@@ -205,20 +228,48 @@ public class SpecialistDanceConfig {
             return false;
         }
 
-        oreDrops.put(blockId, dropId);
-        disabledOres.remove(blockId);
+        blockRules.put(blockId, dropId);
+        disabledBlockRules.remove(blockId);
         dirty = true;
 
         return true;
     }
 
-    public boolean removeRule(@Nullable String rawBlock) {
-        String blockId = normalizeOreId(rawBlock);
+    public boolean addPickupRule(@Nullable String rawItem) {
+        String itemId = normalizeOreId(rawItem);
 
-        if (blockId == null || oreDrops.remove(blockId) == null) {
+        if (itemId == null) {
             return false;
         }
-        disabledOres.remove(blockId);
+
+        if (!pickupRules.contains(itemId)) {
+            pickupRules.add(itemId);
+        }
+        disabledPickupRules.remove(itemId);
+        dirty = true;
+
+        return true;
+    }
+
+    public boolean removeBlockRule(@Nullable String rawBlock) {
+        String blockId = normalizeOreId(rawBlock);
+
+        if (blockId == null || blockRules.remove(blockId) == null) {
+            return false;
+        }
+        disabledBlockRules.remove(blockId);
+        dirty = true;
+
+        return true;
+    }
+
+    public boolean removePickupRule(@Nullable String rawItem) {
+        String itemId = normalizeOreId(rawItem);
+
+        if (itemId == null || !pickupRules.remove(itemId)) {
+            return false;
+        }
+        disabledPickupRules.remove(itemId);
         dirty = true;
 
         return true;
@@ -255,13 +306,13 @@ public class SpecialistDanceConfig {
 
         seenDances.removeIf(name -> name == null || name.isBlank());
 
-        if (oreDrops == null) {
-            oreDrops = defaultOreDrops();
+        if (blockRules == null) {
+            blockRules = defaultBlockRules();
             dirty = true;
         } else {
-            Map<String, String> normalizedDrops = new LinkedHashMap<>();
+            Map<String, String> normalizedRules = new LinkedHashMap<>();
 
-            for (Map.Entry<String, String> entry : oreDrops.entrySet()) {
+            for (Map.Entry<String, String> entry : blockRules.entrySet()) {
                 String key = normalizeOreId(entry.getKey());
                 String value = normalizeOreId(entry.getValue());
 
@@ -274,24 +325,49 @@ public class SpecialistDanceConfig {
                     dirty = true;
                 }
 
-                if (normalizedDrops.put(key, value) != null) {
+                if (normalizedRules.put(key, value) != null) {
                     dirty = true;
                 }
             }
 
-            if (!normalizedDrops.equals(oreDrops)) {
-                oreDrops = normalizedDrops;
+            if (!normalizedRules.equals(blockRules)) {
+                blockRules = normalizedRules;
                 dirty = true;
             }
         }
 
-        if (disabledOres == null) {
-            disabledOres = new ArrayList<>();
+        if (pickupRules == null) {
+            pickupRules = new ArrayList<>();
+            dirty = true;
+        } else {
+            Set<String> normalizedPickup = new LinkedHashSet<>();
+
+            for (String id : pickupRules) {
+                String normalized = normalizeOreId(id);
+
+                if (normalized == null) {
+                    dirty = true;
+                    continue;
+                }
+
+                if (!normalizedPickup.add(normalized)) {
+                    dirty = true;
+                }
+            }
+
+            if (!new ArrayList<>(normalizedPickup).equals(pickupRules)) {
+                pickupRules = new ArrayList<>(normalizedPickup);
+                dirty = true;
+            }
+        }
+
+        if (disabledBlockRules == null) {
+            disabledBlockRules = new ArrayList<>();
             dirty = true;
         } else {
             Set<String> normalizedDisabled = new LinkedHashSet<>();
 
-            for (String id : disabledOres) {
+            for (String id : disabledBlockRules) {
                 String normalized = normalizeOreId(id);
 
                 if (normalized == null) {
@@ -304,8 +380,33 @@ public class SpecialistDanceConfig {
                 }
             }
 
-            if (!new ArrayList<>(normalizedDisabled).equals(disabledOres)) {
-                disabledOres = new ArrayList<>(normalizedDisabled);
+            if (!new ArrayList<>(normalizedDisabled).equals(disabledBlockRules)) {
+                disabledBlockRules = new ArrayList<>(normalizedDisabled);
+                dirty = true;
+            }
+        }
+
+        if (disabledPickupRules == null) {
+            disabledPickupRules = new ArrayList<>();
+            dirty = true;
+        } else {
+            Set<String> normalizedDisabled = new LinkedHashSet<>();
+
+            for (String id : disabledPickupRules) {
+                String normalized = normalizeOreId(id);
+
+                if (normalized == null) {
+                    dirty = true;
+                    continue;
+                }
+
+                if (!normalizedDisabled.add(normalized)) {
+                    dirty = true;
+                }
+            }
+
+            if (!new ArrayList<>(normalizedDisabled).equals(disabledPickupRules)) {
+                disabledPickupRules = new ArrayList<>(normalizedDisabled);
                 dirty = true;
             }
         }

@@ -79,7 +79,7 @@ public class OreTriggersScreen extends Screen {
 
         addRenderableWidget(
             Button.builder(Component.literal("Add rule"), button -> {
-                if (config.addRule(blockText, dropText)) {
+                if (config.addBlockRule(blockText, dropText)) {
                     blockText = "";
                     dropText = "";
                     notice = null;
@@ -94,7 +94,7 @@ public class OreTriggersScreen extends Screen {
 
         addRenderableWidget(
             Button.builder(Component.literal("Reset"), button -> {
-                config.resetOres();
+                config.resetRules();
                 blockText = "";
                 dropText = "";
                 notice = null;
@@ -128,7 +128,7 @@ public class OreTriggersScreen extends Screen {
 
         graphics.drawCenteredString(this.font, this.title, this.width / 2, 16, 0xFFFFFFFF);
 
-        String hint = config.oreDrops.isEmpty()
+        String hint = config.blockRules.isEmpty()
             ? "No rules yet - add one below"
             : "Left-click toggles · right-click deletes · saved on close";
 
@@ -169,14 +169,14 @@ public class OreTriggersScreen extends Screen {
         }
 
         boolean enabled() {
-            return !config.disabledOres.contains(blockId);
+            return !config.disabledBlockRules.contains(blockId);
         }
 
         void toggle() {
             if (enabled()) {
-                config.disabledOres.add(blockId);
+                config.disabledBlockRules.add(blockId);
             } else {
-                config.disabledOres.remove(blockId);
+                config.disabledBlockRules.remove(blockId);
             }
         }
 
@@ -235,8 +235,8 @@ public class OreTriggersScreen extends Screen {
         OreList(Minecraft minecraft, int width, int height, int x, int y) {
             super(minecraft, width, height, x, y);
 
-            for (String blockId : List.copyOf(config.oreDrops.keySet())) {
-                addEntry(new OreEntry(blockId, config.oreDrops.get(blockId), font), ROW_HEIGHT);
+            for (String blockId : List.copyOf(config.blockRules.keySet())) {
+                addEntry(new OreEntry(blockId, config.blockRules.get(blockId), font), ROW_HEIGHT);
             }
         }
 
@@ -250,7 +250,7 @@ public class OreTriggersScreen extends Screen {
             }
 
             if (entry != null && event.button() == 1) {
-                if (config.removeRule(entry.blockId())) {
+                if (config.removeBlockRule(entry.blockId())) {
                     notice = null;
                     rebuildWidgets();
                 }

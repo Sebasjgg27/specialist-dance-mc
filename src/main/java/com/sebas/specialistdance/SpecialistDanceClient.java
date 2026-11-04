@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 import com.sebas.specialistdance.audio.MusicManager;
 import com.sebas.specialistdance.config.SpecialistDanceConfig;
@@ -53,7 +54,7 @@ public class SpecialistDanceClient implements ClientModInitializer {
 
     private record PendingOre(Item expectedItem, long createdAtMillis) {}
 
-    private record DropLink(@NonNull BlockPos orePos, long linkedAtMillis) {}
+    private record DropLink(@Nullable BlockPos orePos, long linkedAtMillis) {}
 
     private final Map<@NonNull BlockPos, PendingOre> pendingOres = new HashMap<>();
     private final Map<Integer, DropLink> dropLinks = new HashMap<>();
@@ -348,6 +349,16 @@ public class SpecialistDanceClient implements ClientModInitializer {
             );
 
             if (sourceOre == null) {
+                if (isPickupTrigger(droppedItem)) {
+                    long linkedAt = System.currentTimeMillis();
+                    dropLinks.put(itemEntity.getId(), new DropLink(null, linkedAt));
+                    log(
+                        "Specialist Dance: linked drop "
+                        + droppedItem
+                        + " (entity " + itemEntity.getId() + ")"
+                        + " as pickup-only trigger"
+                    );
+                }
                 continue;
             }
 
@@ -400,10 +411,21 @@ public class SpecialistDanceClient implements ClientModInitializer {
             return;
         }
 
-        if (triggeredOres.putIfAbsent(link.orePos(), System.currentTimeMillis()) == null) {
+        if (link.orePos() == null) {
+            log("Specialist Dance: activated for pickup-only trigger");
+            triggerDance();
+        } else if (triggeredOres.putIfAbsent(link.orePos(), System.currentTimeMillis()) == null) {
             log(
                 "Specialist Dance: activated for ore at " + link.orePos()
             );
+            triggerDance();
+        }
+
+        if (link.orePos() == null) {
+            log("Specialist Dance: activates for pickup-only trigger");
+            triggerDance();
+        } else if (triggeredOres.putIfAbsent(link.orePos(), System.currentTimeMillis()) == null) {
+            log("Specialist Dance: activated for ore at " + link.orePos());
             triggerDance();
         }
     }
@@ -458,17 +480,17 @@ public class SpecialistDanceClient implements ClientModInitializer {
     private Item expectedDrop(Block block) {
         Identifier blockId = BuiltInRegistries.BLOCK.getKey(block);
 
-        if (blockId == null || config.oreDrops == null) {
+        if (blockId == null || config.blockRules == null) {
             return null;
         }
 
         String oreId = blockId.toString();
 
-        if (config.disabledOres != null && config.disabledOres.contains(oreId)) {
+        if (config.disabledBlockRules != null && config.disabledBlockRules.contains(oreId)) {
             return null;
         }
 
-        String dropId = config.oreDrops.get(oreId);
+        String dropId = config.blockRules.get(oreId);
 
         if (dropId == null) {
             return null;
@@ -488,6 +510,22 @@ public class SpecialistDanceClient implements ClientModInitializer {
         }
 
         return item;
+    }
+
+    private boolean isPickupTrigger(Item item) {
+        Identifier itemId = BuiltInRegistries.ITEM.getKey(item);
+
+        if (itemId == null || config.pickupRules == null) {
+            return false;
+        }
+
+        String id = itemId.toString();
+
+        if (config.disabledPickupRules != null && config.disabledPickupRules.contains(id)) {
+            return false;
+        }
+
+        return config.pickupRules.contains(id);
     }
 
     public void triggerDance() {
