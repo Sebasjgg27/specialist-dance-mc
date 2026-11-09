@@ -25,21 +25,30 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.event.client.player.ClientPlayerBlockBreakEvents;
+import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Block;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
+import net.minecraft.world.phys.BlockHitResult;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -54,12 +63,21 @@ public class SpecialistDanceClient implements ClientModInitializer {
 
     private record PendingOre(Item expectedItem, long createdAtMillis) {}
 
-    private record DropLink(@Nullable BlockPos orePos, long linkedAtMillis) {}
+    private record RecentDeath(@NonNull String sourceId, @NonNull BlockPos pos, long diedAtMillis) {}
+
+    private record DropLink(@Nullable BlockPos orePos, @Nullable BlockPos deathPos, long linkedAtMillis) {}
 
     private final Map<@NonNull BlockPos, PendingOre> pendingOres = new HashMap<>();
     private final Map<Integer, DropLink> dropLinks = new HashMap<>();
     private final Map<Integer, Long> pendingDrops = new HashMap<>();
     private final Map<@NonNull BlockPos, Long> triggeredOres = new HashMap<>();
+    private final Map<@NonNull BlockPos, Long> triggeredDeaths = new HashMap<>();
+    private final Map<Integer, @NonNull String> liveMobs = new HashMap<>();
+    private final Map<Integer, RecentDeath> recentDeaths = new HashMap<>();
+
+    private @Nullable String pendingContainerSourceId;
+    private @Nullable String containerSourceId;
+    private @Nullable Map<Item, Integer> containerCounts;
 
     private ClientLevel lastLevel;
 
@@ -125,7 +143,19 @@ public class SpecialistDanceClient implements ClientModInitializer {
                     return;
                 }
 
-                Item expectedItem = expectedDrop(state.getBlock());
+                Identifier blockId = BuiltInRegistries.BLOCK.getKey(state.getBlock());
+
+                if (blockId == null) {
+                    return;
+                }
+
+                String dropId = config.minedDropFor(blockId.toString());
+
+                if (dropId == null) {
+                    return;
+                }
+
+                Item expectedItem = itemById(dropId);
 
                 if (expectedItem == null) {
                     return;
@@ -140,9 +170,9 @@ public class SpecialistDanceClient implements ClientModInitializer {
                 );
 
                 log(
-                    "Specialist Dance: registered ore "
-                    + state.getBlock()
-                    + " -> " + expectedItem
+                    "Specialist Dance: registered mined "
+                    + blockId
+                    + " -> " + dropId
                     + " at " + orePos
                 );
             }
@@ -154,7 +184,40 @@ public class SpecialistDanceClient implements ClientModInitializer {
                     itemEntity.getId(),
                     System.currentTimeMillis()
                 );
+            } else if (entity instanceof Mob mob) {
+                Identifier typeId = BuiltInRegistries.ENTITY_TYPE.getKey(mob.getType());
+
+                if (typeId != null) {
+                    liveMobs.put(mob.getId(), typeId.toString());
+                }
             }
+        });
+
+        ClientEntityEvents.ENTITY_UNLOAD.register((entity, level) -> {
+            liveMobs.remove(entity.getId());
+        });
+
+        UseBlockCallback.EVENT.register((player, level, hand, hit) -> {
+            if (player != Minecraft.getInstance().player
+                    || hand != InteractionHand.MAIN_HAND
+                    || !config.hasTrigger("container")) {
+                return InteractionResult.PASS;
+            }
+
+            BlockPos containerPos = hit.getBlockPos();
+
+            if (!(level.getBlockEntity(containerPos) instanceof RandomizableContainerBlockEntity)) {
+                return InteractionResult.PASS;
+            }
+
+            Identifier blockId = BuiltInRegistries.BLOCK.getKey(level.getBlockState(containerPos).getBlock());
+
+            if (blockId != null) {
+                pendingContainerSourceId = blockId.toString();
+                log("Specialist Dance: opened container " + pendingContainerSourceId);
+            }
+
+            return InteractionResult.PASS;
         });
 
         ClientTickEvents.END_CLIENT_TICK.register(this::tick);
@@ -276,6 +339,12 @@ public class SpecialistDanceClient implements ClientModInitializer {
             dropLinks.clear();
             pendingDrops.clear();
             triggeredOres.clear();
+            liveMobs.clear();
+            recentDeaths.clear();
+            triggeredDeaths.clear();
+            pendingContainerSourceId = null;
+            containerSourceId = null;
+            containerCounts = null;
             lastLevel = client.level;
             endAnimation("world change");
             return;
@@ -308,7 +377,44 @@ public class SpecialistDanceClient implements ClientModInitializer {
             entry -> now - entry.getValue() > config.linkTimeoutMs
         );
 
+        trackMobDeaths(client, now);
+        tickContainer(client);
+
         resolvePendingDrops(client, now);
+    }
+
+    private void trackMobDeaths(Minecraft client, long now) {
+        if (!config.hasTrigger("mob")) {
+            return;
+        }
+
+        ClientLevel level = client.level;
+
+        if (level == null) {
+            return;
+        }
+
+        Iterator<Map.Entry<Integer, String>> it = liveMobs.entrySet().iterator();
+
+        while (it.hasNext()) {
+            Map.Entry<Integer, String> entry = it.next();
+            Entity entity = level.getEntity(entry.getKey());
+
+            if (entity instanceof Mob mob && mob.isDeadOrDying()) {
+                recentDeaths.put(entry.getKey(), new RecentDeath(entry.getValue(), mob.blockPosition(), now));
+                it.remove();
+            } else if (entity == null) {
+                it.remove();
+            }
+        }
+
+        recentDeaths.entrySet().removeIf(
+            entry -> now - entry.getValue().diedAtMillis() > config.linkTimeoutMs
+        );
+
+        triggeredDeaths.entrySet().removeIf(
+            entry -> now - entry.getValue() > config.linkTimeoutMs
+        );
     }
 
     private void resolvePendingDrops(Minecraft client, long now) {
@@ -342,36 +448,55 @@ public class SpecialistDanceClient implements ClientModInitializer {
             iterator.remove();
 
             Item droppedItem = stack.getItem();
+            long linkedAt = System.currentTimeMillis();
 
             BlockPos sourceOre = findSourceOre(
                 itemEntity.blockPosition(),
                 droppedItem
             );
 
-            if (sourceOre == null) {
-                if (isPickupTrigger(droppedItem)) {
-                    long linkedAt = System.currentTimeMillis();
-                    dropLinks.put(itemEntity.getId(), new DropLink(null, linkedAt));
-                    log(
-                        "Specialist Dance: linked drop "
-                        + droppedItem
-                        + " (entity " + itemEntity.getId() + ")"
-                        + " as pickup-only trigger"
-                    );
-                }
+            if (sourceOre != null) {
+                dropLinks.put(itemEntity.getId(), new DropLink(sourceOre, null, linkedAt));
+                triggeredOres.computeIfPresent(sourceOre, (orePos, previous) -> linkedAt);
+
+                log(
+                    "Specialist Dance: linked drop "
+                    + droppedItem
+                    + " (entity " + itemEntity.getId() + ")"
+                    + " to ore at " + sourceOre
+                );
                 continue;
             }
 
-            long linkedAt = System.currentTimeMillis();
-            dropLinks.put(itemEntity.getId(), new DropLink(sourceOre, linkedAt));
-            triggeredOres.computeIfPresent(sourceOre, (orePos, previous) -> linkedAt);
-
-            log(
-                "Specialist Dance: linked drop "
-                + droppedItem
-                + " (entity " + itemEntity.getId() + ")"
-                + " to ore at " + sourceOre
+            BlockPos sourceDeath = findSourceDeath(
+                itemEntity.blockPosition(),
+                droppedItem
             );
+
+            if (sourceDeath != null) {
+                dropLinks.put(itemEntity.getId(), new DropLink(null, sourceDeath, linkedAt));
+
+                log(
+                    "Specialist Dance: linked drop "
+                    + droppedItem
+                    + " (entity " + itemEntity.getId() + ")"
+                    + " to death at " + sourceDeath
+                );
+                continue;
+            }
+
+            String itemId = itemIdOf(droppedItem);
+
+            if (config.matches("pickup", null, itemId)) {
+                dropLinks.put(itemEntity.getId(), new DropLink(null, null, linkedAt));
+
+                log(
+                    "Specialist Dance: linked drop "
+                    + droppedItem
+                    + " (entity " + itemEntity.getId() + ")"
+                    + " as pickup-only trigger"
+                );
+            }
         }
     }
 
@@ -404,6 +529,36 @@ public class SpecialistDanceClient implements ClientModInitializer {
         return best;
     }
 
+    private @Nullable BlockPos findSourceDeath(@NonNull BlockPos itemPos, Item droppedItem) {
+        if (!config.hasTrigger("mob")) {
+            return null;
+        }
+
+        long now = System.currentTimeMillis();
+        String itemId = itemIdOf(droppedItem);
+        BlockPos best = null;
+        double bestDistance = Double.MAX_VALUE;
+
+        for (RecentDeath death : recentDeaths.values()) {
+            if (now - death.diedAtMillis() > config.linkTimeoutMs) {
+                continue;
+            }
+
+            if (!config.matches("mob", death.sourceId(), itemId)) {
+                continue;
+            }
+
+            double distance = death.pos().distSqr(itemPos);
+
+            if (distance <= config.searchRadiusSquared && distance < bestDistance) {
+                bestDistance = distance;
+                best = death.pos();
+            }
+        }
+
+        return best;
+    }
+
     public void onItemPickup(int entityId) {
         DropLink link = dropLinks.get(entityId);
 
@@ -411,23 +566,24 @@ public class SpecialistDanceClient implements ClientModInitializer {
             return;
         }
 
-        if (link.orePos() == null) {
-            log("Specialist Dance: activated for pickup-only trigger");
-            triggerDance();
-        } else if (triggeredOres.putIfAbsent(link.orePos(), System.currentTimeMillis()) == null) {
-            log(
-                "Specialist Dance: activated for ore at " + link.orePos()
-            );
-            triggerDance();
+        if (link.orePos() != null) {
+            if (triggeredOres.putIfAbsent(link.orePos(), System.currentTimeMillis()) == null) {
+                log("Specialist Dance: activated for mined ore at " + link.orePos());
+                triggerDance();
+            }
+            return;
         }
 
-        if (link.orePos() == null) {
-            log("Specialist Dance: activates for pickup-only trigger");
-            triggerDance();
-        } else if (triggeredOres.putIfAbsent(link.orePos(), System.currentTimeMillis()) == null) {
-            log("Specialist Dance: activated for ore at " + link.orePos());
-            triggerDance();
+        if (link.deathPos() != null) {
+            if (triggeredDeaths.putIfAbsent(link.deathPos(), System.currentTimeMillis()) == null) {
+                log("Specialist Dance: activated for mob death at " + link.deathPos());
+                triggerDance();
+            }
+            return;
         }
+
+        log("Specialist Dance: activated for pickup-only trigger");
+        triggerDance();
     }
 
     public void queueLayoutFor(List<String> names) {
@@ -477,55 +633,79 @@ public class SpecialistDanceClient implements ClientModInitializer {
         }
     }
 
-    private Item expectedDrop(Block block) {
-        Identifier blockId = BuiltInRegistries.BLOCK.getKey(block);
-
-        if (blockId == null || config.blockRules == null) {
-            return null;
+    private void tickContainer(Minecraft client) {
+        if (pendingContainerSourceId == null && containerSourceId == null) {
+            return;
         }
 
-        String oreId = blockId.toString();
+        Player player = client.player;
 
-        if (config.disabledBlockRules != null && config.disabledBlockRules.contains(oreId)) {
-            return null;
+        if (player == null) {
+            return;
         }
 
-        String dropId = config.blockRules.get(oreId);
-
-        if (dropId == null) {
-            return null;
+        if (pendingContainerSourceId != null) {
+            containerSourceId = pendingContainerSourceId;
+            pendingContainerSourceId = null;
+            containerCounts = inventoryCounts(player.getInventory());
+            return;
         }
 
-        Identifier dropKey = Identifier.tryParse(dropId);
-
-        if (dropKey == null) {
-            log("Specialist Dance: ore " + oreId + " has invalid drop id " + dropId);
-            return null;
+        if (!(client.screen instanceof AbstractContainerScreen<?>)) {
+            containerSourceId = null;
+            containerCounts = null;
+            return;
         }
 
-        Item item = BuiltInRegistries.ITEM.getValue(dropKey);
+        Map<Item, Integer> current = inventoryCounts(player.getInventory());
+        String sourceId = containerSourceId;
 
-        if (item == null) {
-            log("Specialist Dance: ore " + oreId + " points at unknown item " + dropId);
+        if (containerCounts != null && sourceId != null) {
+            for (Map.Entry<Item, Integer> e : current.entrySet()) {
+                int delta = e.getValue() - containerCounts.getOrDefault(e.getKey(), 0);
+
+                if (delta > 0 && config.matches("container", sourceId, itemIdOf(e.getKey()))) {
+                    log("Specialist Dance: activated for container " + sourceId);
+                    triggerDance();
+                    break;
+                }
+            }
         }
 
-        return item;
+        containerCounts = current;
     }
 
-    private boolean isPickupTrigger(Item item) {
-        Identifier itemId = BuiltInRegistries.ITEM.getKey(item);
+    private static Map<Item, Integer> inventoryCounts(net.minecraft.world.entity.player.Inventory inv) {
+        Map<Item, Integer> counts = new HashMap<>();
 
-        if (itemId == null || config.pickupRules == null) {
-            return false;
+        for (int i = 0; i < inv.getContainerSize(); i++) {
+            ItemStack stack = inv.getItem(i);
+
+            if (stack.isEmpty()) {
+                continue;
+            }
+
+            counts.merge(stack.getItem(), stack.getCount(), Integer::sum);
         }
 
-        String id = itemId.toString();
+        return counts;
+    }
 
-        if (config.disabledPickupRules != null && config.disabledPickupRules.contains(id)) {
-            return false;
+    private static @Nullable Item itemById(@NonNull String id) {
+        Identifier parsed = Identifier.tryParse(id);
+
+        if (parsed == null) {
+            return null;
         }
 
-        return config.pickupRules.contains(id);
+        Item item = BuiltInRegistries.ITEM.getValue(parsed);
+
+        return item == Items.AIR ? null : item;
+    }
+
+    private static @NonNull String itemIdOf(Item item) {
+        Identifier id = BuiltInRegistries.ITEM.getKey(item);
+        return id == null ? "minecraft:air" : id.toString();
     }
 
     public void triggerDance() {

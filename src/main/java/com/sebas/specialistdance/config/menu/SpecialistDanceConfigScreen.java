@@ -36,9 +36,14 @@ public class SpecialistDanceConfigScreen extends Screen {
     private static final int CONTENT_WIDTH = 300;
     private static final int ROW_HEIGHT = 18;
     private static final int GAP = 2;
-    private static final int TOP_Y = 32;
 
     private static final List<String> CATEGORIES = List.of("Music", "Dance", "Animation", "Rules", "Content");
+    private static final List<String> RULE_HELP = List.of(
+        "mined - trigger when you mine this block and pick up its drop",
+        "pickup - trigger whenever you collect this item, no source",
+        "mob - trigger when you kill this mob and pick up its drop",
+        "container - trigger when you take this item from this container"
+    );
     private static final Function<@NonNull String, Component> STRING_COMPONENT = Component::literal;
 
     private final SpecialistDanceConfig config;
@@ -54,9 +59,19 @@ public class SpecialistDanceConfigScreen extends Screen {
     private int contentWidth;
     private int paneBottom;
     private int rowsBottom;
+    private int headerTop;
+    private int paneTop;
+    private int previewTop;
+    private int previewBottom;
+    private int cursor;
     private int listBottom;
     private boolean hasList() {
-        return category == 0;
+        return category == 0 || category == 1;
+    }
+    private int nextRow() {
+        int row = cursor;
+        cursor += ROW_HEIGHT + GAP;
+        return row;
     }
 
     public SpecialistDanceConfigScreen(
@@ -79,22 +94,26 @@ public class SpecialistDanceConfigScreen extends Screen {
         int left = this.width / 2 - total / 2;
 
         sidebarX = left;
-        sidebarTop = TOP_Y;
         contentX = left + SIDEBAR_WIDTH + PANE_GAP;
-        paneBottom = this.height - 8 - ROW_HEIGHT;
 
-        int rows = rowsFor(category);
-        int row = TOP_Y;
-        rowsBottom = row + rows * ROW_HEIGHT + (rows - 1) * GAP;
+        headerTop = 8;
+        paneTop = headerTop + this.font.lineHeight + 6;
+        sidebarTop = paneTop;
+        paneBottom = this.height - 8 - ROW_HEIGHT;
         listBottom = paneBottom - (hasList() ? ROW_HEIGHT + GAP : 0) - 4;
+        previewTop = paneTop;
+        previewBottom = paneBottom - 4;
+        cursor = paneTop;
 
         switch (category) {
-            case 0 -> addMusicRows(row);
-            case 1 -> addDanceRows(row);
-            case 2 -> addAnimationRows(row);
-            case 3 -> addOreRows(row);
-            default -> addContentRows(row);
+            case 0 -> addMusicRows();
+            case 1 -> addDanceRows();
+            case 2 -> addAnimationRows();
+            case 3 -> addOreRows();
+            default -> addContentRows();
         }
+
+        rowsBottom = cursor - GAP;
 
         addRenderableWidget(
             Button.builder(Component.literal("Done"), button -> onClose())
@@ -103,17 +122,7 @@ public class SpecialistDanceConfigScreen extends Screen {
         );
     }
 
-    private int rowsFor(int index) {
-        return switch (index) {
-            case 0 -> 3;
-            case 1 -> 3;
-            case 2 -> 2;
-            case 3 -> 1;
-            default -> 2;
-        };
-    }
-
-    private void addMusicRows(int row) {
+    private void addMusicRows() {
         List<String> tracks = music.getAvailableTracks();
 
         if (!tracks.contains(config.musicTrack)) {
@@ -122,20 +131,38 @@ public class SpecialistDanceConfigScreen extends Screen {
 
         addRenderableWidget(
             Checkbox.builder(Component.literal("Music Enabled"), this.font)
-                .pos(contentX, row)
+                .pos(contentX, nextRow())
                 .selected(config.musicEnabled)
                 .onValueChange((checkbox, selected) -> {
                     config.musicEnabled = selected;
-                    if (!selected) {
-                        music.stop();
-                    }
+                    if (!selected) music.stop();
                 })
+                .build()
+        );
+
+        addRenderableWidget(new VolumeSlider(contentX, nextRow(), contentWidth, ROW_HEIGHT));
+
+        int half = (contentWidth - 10) / 2;
+        int previewRow = nextRow();
+
+        addRenderableWidget(
+            Button.builder(Component.literal("Play preview"), button -> {
+                DanceRegistry.Dance dance = danceRegistry.find(config.activeDance);
+                music.play(music.resolveTrackForDance(dance.name(), dance.track()));
+            })
+                .bounds(contentX, previewRow, half, ROW_HEIGHT)
+                .build()
+        );
+
+        addRenderableWidget(
+            Button.builder(Component.literal("Stop"), button -> music.stop())
+                .bounds(contentX + half + 10, previewRow, half, ROW_HEIGHT)
                 .build()
         );
 
         addRenderableWidget(
             new NameList(
-                contentX, rowsBottom + GAP, contentWidth, listBottom - rowsBottom - GAP,
+                contentX, cursor, contentWidth, listBottom - cursor,
                 tracks, config.musicTrack,
                 name -> config.musicTrack = name,
                 false
@@ -148,31 +175,9 @@ public class SpecialistDanceConfigScreen extends Screen {
                 .build()
         );
 
-        row += ROW_HEIGHT + GAP;
-
-        addRenderableWidget(new VolumeSlider(contentX, row, contentWidth, ROW_HEIGHT));
-
-        row += ROW_HEIGHT + GAP;
-
-        int half = (contentWidth - 10) / 2;
-
-        addRenderableWidget(
-            Button.builder(Component.literal("Play preview"), button -> {
-                DanceRegistry.Dance dance = danceRegistry.find(config.activeDance);
-                music.play(music.resolveTrackForDance(dance.name(), dance.track()));
-            })
-                .bounds(contentX, row, half, ROW_HEIGHT)
-                .build()
-        );
-
-        addRenderableWidget(
-            Button.builder(Component.literal("Stop"), button -> music.stop())
-                .bounds(contentX + half + 10, row, half, ROW_HEIGHT)
-                .build()
-        );
     }
 
-    private void addDanceRows(int row) {
+    private void addDanceRows() {
         List<String> dances = danceRegistry.getAvailableDances();
 
         if (!dances.contains(config.activeDance)) {
@@ -180,36 +185,32 @@ public class SpecialistDanceConfigScreen extends Screen {
         }
 
         addRenderableWidget(
+            Button.builder(Component.literal("Preview dance on close"), button -> previewDance = true)
+                .bounds(contentX, nextRow(), contentWidth, ROW_HEIGHT)
+                .build()
+        );
+
+        addRenderableWidget(
+            Button.builder(Component.literal("Position dance"), button -> 
+                minecraft.setScreen(new DanceLayoutScreen(
+                    config, danceRegistry, 
+                    SpecialistDanceClient.getInstance().getDanceTextures(), this))
+            )
+                .bounds(contentX, nextRow(), contentWidth, ROW_HEIGHT)
+                .build()
+        );
+
+        addRenderableWidget(
             new NameList(
-                contentX, row, contentWidth, 3 * ROW_HEIGHT + 2 * GAP,
+                contentX, cursor, contentWidth, listBottom - cursor,
                 dances, config.activeDance,
                 name -> config.activeDance = name,
                 true
             )
         );
-
-        row += 3 * ROW_HEIGHT + 3 * GAP;
-
-        addRenderableWidget(
-            Button.builder(Component.literal("Preview dance on close"), button -> previewDance = true)
-                .bounds(contentX, row, contentWidth, ROW_HEIGHT)
-                .build()
-        );
-
-        row += ROW_HEIGHT + GAP;
-
-        addRenderableWidget(
-            Button.builder(Component.literal("Position dance"), button -> {
-                minecraft.setScreen(new DanceLayoutScreen(config, danceRegistry, SpecialistDanceClient.getInstance().getDanceTextures(), this));
-            })
-                .bounds(contentX, row, contentWidth, ROW_HEIGHT)
-                .build()
-        );
-
-        rowsBottom = row + ROW_HEIGHT;
     }
 
-    private void addAnimationRows(int row) {
+    private void addAnimationRows() {
         List<String> behaviors = SpecialistDanceConfig.ANIMATION_END_BEHAVIORS;
 
         if (!behaviors.contains(config.animationEndBehavior)) {
@@ -220,42 +221,39 @@ public class SpecialistDanceConfigScreen extends Screen {
             CycleButton.<String>builder(STRING_COMPONENT, requireString(config.animationEndBehavior))
                 .withValues(behaviors)
                 .create(
-                    contentX, row, contentWidth, ROW_HEIGHT,
+                    contentX, nextRow(), contentWidth, ROW_HEIGHT,
                     Component.literal("End behavior"),
                     (button, value) -> config.animationEndBehavior = value
                 )
         );
 
-        row += ROW_HEIGHT + GAP;
-
-        addRenderableWidget(new SpeedSlider(contentX, row, contentWidth, ROW_HEIGHT));
+        addRenderableWidget(new SpeedSlider(contentX, nextRow(), contentWidth, ROW_HEIGHT));
     }
 
-    private void addOreRows(int row) {
+    private void addOreRows() {
         addRenderableWidget(
             Button.builder(Component.literal("Your rules"), button ->
                 minecraft.setScreen(new OreTriggersScreen(config, this)))
-                .bounds(contentX, row, contentWidth, ROW_HEIGHT)
+                .bounds(contentX, nextRow(), contentWidth, ROW_HEIGHT)
                 .build()
         );
     }
 
-    private void addContentRows(int row) {
+    private void addContentRows() {
         int half = (contentWidth - 10) / 2;
+        int foldersRow = nextRow();
 
         addRenderableWidget(
             Button.builder(Component.literal("Open music folder"), button -> openFolder("music"))
-            .bounds(contentX, row, half, ROW_HEIGHT)
+            .bounds(contentX, foldersRow, half, ROW_HEIGHT)
             .build()
         );
 
         addRenderableWidget(
             Button.builder(Component.literal("Open dances folder"), button -> openFolder("dances"))
-                .bounds(contentX + half + 10, row, half, ROW_HEIGHT)
+                .bounds(contentX + half + 10, foldersRow, half, ROW_HEIGHT)
                 .build()
         );
-
-        row += ROW_HEIGHT + GAP;
 
         addRenderableWidget(
             Button.builder(Component.literal("Rescan"), button -> {
@@ -265,7 +263,7 @@ public class SpecialistDanceConfigScreen extends Screen {
                 SpecialistDanceClient.getInstance().queueLayoutFor(added);
                 rebuildWidgets();
             })
-            .bounds(contentX, row, contentWidth, ROW_HEIGHT)
+            .bounds(contentX, nextRow(), contentWidth, ROW_HEIGHT)
             .build()
         );
     }
@@ -322,25 +320,19 @@ public class SpecialistDanceConfigScreen extends Screen {
         super.renderBackground(graphics, mouseX, mouseY, partialTick);
 
         graphics.fill(0, 0, this.width, this.height, 0x60000000);
-        graphics.fill(sidebarX - 6, TOP_Y - 20, contentX + contentWidth + 6, paneBottom + ROW_HEIGHT + 6, 0x80000000);
+        graphics.fill(sidebarX - 6, paneTop - 20, contentX + contentWidth + 6, paneBottom + ROW_HEIGHT + 6, 0x80000000);
     }
 
     @Override
     public void render(@NonNull GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         super.render(graphics, mouseX, mouseY, partialTick);
 
-        graphics.drawCenteredString(
-            this.font,
-            this.title,
-            this.width / 2,
-            12,
-            0xFFFFFFFF
-        );
+        graphics.drawCenteredString(this.font, this.title, this.width / 2, headerTop, 0xFFFFFFFF);
 
         int step = ROW_HEIGHT + GAP;
         int dividerX = contentX - PANE_GAP / 2;
 
-        graphics.fill(dividerX, TOP_Y - 6, dividerX + 1, paneBottom, 0x40FFFFFF);
+        graphics.fill(dividerX, paneTop - 6, dividerX + 1, paneBottom, 0x40FFFFFF);
 
         for (int i = 0; i < CATEGORIES.size(); i++) {
             boolean active = i == category;
@@ -354,19 +346,61 @@ public class SpecialistDanceConfigScreen extends Screen {
             );
         }
 
-        graphics.drawString(this.font, CATEGORIES.get(category), contentX, TOP_Y - 6, 0xFFB0B0B0);
+        graphics.drawString(this.font, CATEGORIES.get(category), contentX, paneTop - 6, 0xFFB0B0B0);
 
-        if (category == 1) {
+        if (category == 0) {
+            DanceRegistry.Dance dance = danceRegistry.find(config.activeDance);
+            String track = music.resolveTrackForDance(dance.name(), dance.track());
+
+            graphics.drawString(
+                this.font,
+                "gif used: " + dance.name() + " · track: " + track,
+                contentX,
+                listBottom + GAP + ROW_HEIGHT + GAP,
+                0xFFB0B0B0
+            );
+        }
+
+        if (category == 2) {
             drawDancePreview(graphics);
+        }
+
+        if (category == 3) {
+            int enabled = 0;
+
+            for (SpecialistDanceConfig.Rule r : config.rules) {
+                if (r.enabled) enabled++;
+            }
+
+            graphics.drawString(
+                this.font,
+                config.rules.size() + " rules (" + enabled + " enabled)",
+                contentX, rowsBottom + GAP + 2, 0xFFB0B0B0
+            );
+
+            int y = rowsBottom + GAP + 14;
+
+            for (String line : RULE_HELP) {
+                graphics.drawString(this.font, line, contentX, y, 0xFFA0A0A0);
+                y += this.font.lineHeight + 2;
+            }
         }
     }
 
     private void drawDancePreview(GuiGraphics graphics) {
         DanceRegistry.Dance dance = danceRegistry.find(config.activeDance);
-        int top = rowsBottom + GAP;
-        int boxHeight = paneBottom - 6 - top;
+        int top = previewTop;
+        int boxHeight = previewBottom - top;
 
-        if (dance.frameCount() <= 0 || boxHeight < 24) {
+        if (boxHeight < 24) {
+            return;
+        }
+
+        graphics.renderOutline(contentX - 1, top - 1, contentWidth + 2, boxHeight + 2, 0x40FFFFFF);
+
+        if (dance.frameCount() <= 0) {
+            graphics.drawCenteredString(this.font, "No frames in " + dance.name(),
+                contentX + contentWidth / 2, top + boxHeight / 2 - this.font.lineHeight / 2, 0xFFB0B0B0);
             return;
         }
 
@@ -376,6 +410,8 @@ public class SpecialistDanceConfigScreen extends Screen {
         DanceTextures.Frame frame = client.getDanceTextures().get(minecraft, dance, index);
 
         if (frame == null) {
+            graphics.drawCenteredString(this.font, "Frames not loaded yet",
+                contentX + contentWidth / 2, top + boxHeight / 2 - this.font.lineHeight / 2, 0xFFB0B0B0);
             return;
         }
 
@@ -385,21 +421,11 @@ public class SpecialistDanceConfigScreen extends Screen {
         int x = contentX + (contentWidth - width) / 2;
         int y = top + (boxHeight - height) / 2;
 
-        graphics.renderOutline(contentX - 1, top - 1, contentWidth + 2, boxHeight + 2, 0x40FFFFFF);
-
         graphics.blit(
             RenderPipelines.GUI_TEXTURED,
             Objects.requireNonNull(frame.texture()),
-            x,
-            y,
-            0.0f,
-            0.0f,
-            width,
-            height,
-            frame.width(),
-            frame.height(),
-            frame.width(),
-            frame.height()
+            x, y, 0.0f, 0.0f, width, height,
+            frame.width(), frame.height(), frame.width(), frame.height()
         );
     }
 

@@ -5,12 +5,9 @@ import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
@@ -26,13 +23,14 @@ import net.fabricmc.loader.api.FabricLoader;
 public class SpecialistDanceConfig {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Path PATH  = FabricLoader.getInstance().getConfigDir().resolve("specialist-dance.json");
-    private static final int CURRENT_VERSION = 3;
+    private static final int CURRENT_VERSION = 4;
 
     private static final Pattern ORE_NAMESPACE = Pattern.compile("[a-z0-9_.-]+");
     private static final Pattern ORE_PATH = Pattern.compile("[a-z0-9/.-]+");
     private transient boolean dirty;
 
     public static final List<String> ANIMATION_END_BEHAVIORS = List.of("stop", "hold", "loop");
+    public static final List<String> RULE_TRIGGERS = List.of("mined", "pickup", "mob", "container");
     public static final double MIN_ANIMATION_SPEED = 0.1;
     public static final double MAX_ANIMATION_SPEED = 10.0;
 
@@ -47,10 +45,7 @@ public class SpecialistDanceConfig {
     public double searchRadiusSquared = 16.0;
     public int dropResolveTimeoutMs = 2_000;
 
-    public Map<String, String> blockRules = defaultBlockRules();
-    public List<String> pickupRules = new ArrayList<>();
-    public List<String> disabledBlockRules = new ArrayList<>();
-    public List<String> disabledPickupRules = new ArrayList<>();
+    public List<Rule> rules = defaultRules();
 
     public int frameDurationMs = 100;
     public int drawSize = 160;
@@ -86,21 +81,34 @@ public class SpecialistDanceConfig {
                             config.configVersion = 0;
                         }
 
-                        // Migrate oreDrops → blockRules (v2 → v3 rename)
-                        if (raw.has("oreDrops") && !raw.has("blockRules")) {
-                            config.blockRules = GSON.fromJson(
-                                raw.getAsJsonObject("oreDrops"),
-                                new com.google.gson.reflect.TypeToken<Map<String, String>>() {}.getType()
-                            );
-                            config.dirty = true;
-                        }
+                        // Migrate v3 (blockRules/pickupRules/disabled*) → v4 (List<Rule>)
+                        if (!raw.has("rules") && (raw.has("blockRules") || raw.has("pickupRules"))) {
+                            config.rules = new ArrayList<>();
+                            Map<String, String> legacyBlocks = raw.has("blockRules")
+                                ? GSON.fromJson(raw.getAsJsonObject("blockRules"),
+                                    new com.google.gson.reflect.TypeToken<Map<String, String>>() {}.getType())
+                                : Map.of();
+                            List<String> legacyPickup = raw.has("pickupRules")
+                                ? GSON.fromJson(raw.getAsJsonArray("pickupRules"),
+                                    new com.google.gson.reflect.TypeToken<List<String>>() {}.getType())
+                                : List.of();
+                            List<String> legacyDisabledBlocks = raw.has("disabledBlockRules")
+                                ? GSON.fromJson(raw.getAsJsonArray("disabledBlockRules"),
+                                    new com.google.gson.reflect.TypeToken<List<String>>() {}.getType())
+                                : List.of();
+                            List<String> legacyDisabledPickup = raw.has("disabledPickupRules")
+                                ? GSON.fromJson(raw.getAsJsonArray("disabledPickupRules"),
+                                    new com.google.gson.reflect.TypeToken<List<String>>() {}.getType())
+                                : List.of();
 
-                        // Migrate disabledOres → disabledBlockRules (v2 → v3 rename)
-                        if (raw.has("disabledOres") && !raw.has("disabledBlockRules")) {
-                            config.disabledBlockRules = GSON.fromJson(
-                                raw.getAsJsonArray("disabledOres"),
-                                new com.google.gson.reflect.TypeToken<List<String>>() {}.getType()
-                            );
+                            for (Map.Entry<String, String> e : legacyBlocks.entrySet()) {
+                                config.rules.add(new Rule("mined", e.getKey(), e.getValue(),
+                                    !legacyDisabledBlocks.contains(e.getKey())));
+                            }
+                            for (String itemId : legacyPickup) {
+                                config.rules.add(new Rule("pickup", "", itemId,
+                                    !legacyDisabledPickup.contains(itemId)));
+                            }
                             config.dirty = true;
                         }
 
@@ -169,19 +177,19 @@ public class SpecialistDanceConfig {
         } catch (IOException ignored) {}
     }
 
-    private static Map<String, String> defaultBlockRules() {
-        Map<String, String> drops = new LinkedHashMap<>();
-        drops.put("minecraft:diamond_ore", "minecraft:diamond");
-        drops.put("minecraft:deepslate_diamond_ore", "minecraft:diamond");
-        drops.put("minecraft:emerald_ore", "minecraft:emerald");
-        drops.put("minecraft:deepslate_emerald_ore", "minecraft:emerald");
-        drops.put("minecraft:gold_ore", "minecraft:raw_gold");
-        drops.put("minecraft:deepslate_gold_ore", "minecraft:raw_gold");
-        drops.put("minecraft:nether_gold_ore", "minecraft:gold_nugget");
-        drops.put("minecraft:iron_ore", "minecraft:raw_iron");
-        drops.put("minecraft:deepslate_iron_ore", "minecraft:raw_iron");
-        drops.put("minecraft:ancient_debris", "minecraft:ancient_debris");
-        return drops;
+    private static List<Rule> defaultRules() {
+    List<Rule> list = new ArrayList<>();
+    list.add(new Rule("mined", "minecraft:diamond_ore",        "minecraft:diamond",       true));
+    list.add(new Rule("mined", "minecraft:deepslate_diamond_ore","minecraft:diamond",      true));
+    list.add(new Rule("mined", "minecraft:emerald_ore",        "minecraft:emerald",       true));
+    list.add(new Rule("mined", "minecraft:deepslate_emerald_ore","minecraft:emerald",      true));
+    list.add(new Rule("mined", "minecraft:gold_ore",           "minecraft:raw_gold",      true));
+    list.add(new Rule("mined", "minecraft:deepslate_gold_ore", "minecraft:raw_gold",      true));
+    list.add(new Rule("mined", "minecraft:nether_gold_ore",    "minecraft:gold_nugget",   true));
+    list.add(new Rule("mined", "minecraft:iron_ore",           "minecraft:raw_iron",      true));
+    list.add(new Rule("mined", "minecraft:deepslate_iron_ore", "minecraft:raw_iron",      true));
+    list.add(new Rule("mined", "minecraft:ancient_debris",     "minecraft:ancient_debris",true));
+    return list;
     }
 
     static @Nullable String normalizeOreId(@Nullable String raw) {
@@ -213,66 +221,72 @@ public class SpecialistDanceConfig {
     }
 
     public void resetRules() {
-        blockRules = defaultBlockRules();
-        pickupRules = new ArrayList<>();
-        disabledBlockRules = new ArrayList<>();
-        disabledPickupRules = new ArrayList<>();
+        rules = defaultRules();
         dirty = true;
     }
 
-    public boolean addBlockRule(@Nullable String rawBlock, @Nullable String rawDrop) {
-        String blockId = normalizeOreId(rawBlock);
-        String dropId = normalizeOreId(rawDrop);
+    public boolean addRule(@Nullable String rawTrigger, @Nullable String rawSource, @Nullable String rawItem) {
 
-        if (blockId == null || dropId == null) {
-            return false;
-        }
-
-        blockRules.put(blockId, dropId);
-        disabledBlockRules.remove(blockId);
-        dirty = true;
-
-        return true;
-    }
-
-    public boolean addPickupRule(@Nullable String rawItem) {
+        if (rawTrigger == null || !RULE_TRIGGERS.contains(rawTrigger)) return false;
         String itemId = normalizeOreId(rawItem);
+        if (itemId == null) return false;
 
-        if (itemId == null) {
-            return false;
-        }
+        String sourceId = "pickup".equals(rawTrigger) ? "" : normalizeOreId(rawSource);
+        if ("pickup".equals(rawTrigger) == false && sourceId == null) return false;
 
-        if (!pickupRules.contains(itemId)) {
-            pickupRules.add(itemId);
-        }
-        disabledPickupRules.remove(itemId);
+        Rule candidate = new Rule(rawTrigger, sourceId, itemId, true);
+        if (containsRule(rules, candidate)) return false;
+
+        rules.add(candidate);
         dirty = true;
-
         return true;
     }
 
-    public boolean removeBlockRule(@Nullable String rawBlock) {
-        String blockId = normalizeOreId(rawBlock);
-
-        if (blockId == null || blockRules.remove(blockId) == null) {
-            return false;
-        }
-        disabledBlockRules.remove(blockId);
+    public boolean toggleRule(Rule rule) {
+        rule.enabled = !rule.enabled;
         dirty = true;
-
         return true;
     }
 
-    public boolean removePickupRule(@Nullable String rawItem) {
-        String itemId = normalizeOreId(rawItem);
-
-        if (itemId == null || !pickupRules.remove(itemId)) {
-            return false;
-        }
-        disabledPickupRules.remove(itemId);
+    public boolean removeRule(Rule rule) {
+        if (!rules.remove(rule)) return false;
         dirty = true;
-
         return true;
+    }
+
+    public static boolean containsRule(List<Rule> list, Rule candidate) {
+        for (Rule r : list) {
+            if (r.trigger.equals(candidate.trigger)
+                    && r.source.equals(candidate.source)
+                    && r.item.equals(candidate.item)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public @Nullable String minedDropFor(@Nullable String blockId) {
+        if (blockId == null) return null;
+        for (Rule r : rules) {
+            if (r.enabled && "mined".equals(r.trigger) && blockId.equals(r.source)) {
+                return r.item;
+            }
+        }
+        return null;
+    }
+
+    public boolean matches(String trigger, @Nullable String sourceId, String itemId) {
+        for (Rule r : rules) {
+            if (r.enabled && r.matches(trigger, sourceId, itemId)) return true;
+        }
+        return false;
+    }
+
+    public boolean hasTrigger(String trigger) {
+        for (Rule r : rules) {
+            if (r.enabled && r.trigger.equals(trigger)) return true;
+        }
+        return false;
     }
 
     private void sanitize() {
@@ -306,109 +320,44 @@ public class SpecialistDanceConfig {
 
         seenDances.removeIf(name -> name == null || name.isBlank());
 
-        if (blockRules == null) {
-            blockRules = defaultBlockRules();
+        if (rules == null) {
+            rules = defaultRules();
             dirty = true;
         } else {
-            Map<String, String> normalizedRules = new LinkedHashMap<>();
+            List<Rule> normalized = new ArrayList<>();
 
-            for (Map.Entry<String, String> entry : blockRules.entrySet()) {
-                String key = normalizeOreId(entry.getKey());
-                String value = normalizeOreId(entry.getValue());
-
-                if (key == null || value == null) {
+            for (Rule r : rules) {
+                if (r == null || r.trigger == null || !RULE_TRIGGERS.contains(r.trigger)) {
                     dirty = true;
                     continue;
                 }
 
-                if (!key.equals(entry.getKey()) || !value.equals(entry.getValue())) {
-                    dirty = true;
-                }
-
-                if (normalizedRules.put(key, value) != null) {
-                    dirty = true;
-                }
-            }
-
-            if (!normalizedRules.equals(blockRules)) {
-                blockRules = normalizedRules;
-                dirty = true;
-            }
-        }
-
-        if (pickupRules == null) {
-            pickupRules = new ArrayList<>();
-            dirty = true;
-        } else {
-            Set<String> normalizedPickup = new LinkedHashSet<>();
-
-            for (String id : pickupRules) {
-                String normalized = normalizeOreId(id);
-
-                if (normalized == null) {
+                String item = normalizeOreId(r.item);
+                if (item == null) {
                     dirty = true;
                     continue;
                 }
 
-                if (!normalizedPickup.add(normalized)) {
-                    dirty = true;
-                }
-            }
-
-            if (!new ArrayList<>(normalizedPickup).equals(pickupRules)) {
-                pickupRules = new ArrayList<>(normalizedPickup);
-                dirty = true;
-            }
-        }
-
-        if (disabledBlockRules == null) {
-            disabledBlockRules = new ArrayList<>();
-            dirty = true;
-        } else {
-            Set<String> normalizedDisabled = new LinkedHashSet<>();
-
-            for (String id : disabledBlockRules) {
-                String normalized = normalizeOreId(id);
-
-                if (normalized == null) {
+                String source = "pickup".equals(r.trigger) ? "" : normalizeOreId(r.source);
+                if (source == null) {
                     dirty = true;
                     continue;
                 }
 
-                if (!normalizedDisabled.add(normalized)) {
+                if (!item.equals(r.item) || !source.equals(r.source == null ? "" : r.source)) {
                     dirty = true;
                 }
-            }
 
-            if (!new ArrayList<>(normalizedDisabled).equals(disabledBlockRules)) {
-                disabledBlockRules = new ArrayList<>(normalizedDisabled);
-                dirty = true;
-            }
-        }
-
-        if (disabledPickupRules == null) {
-            disabledPickupRules = new ArrayList<>();
-            dirty = true;
-        } else {
-            Set<String> normalizedDisabled = new LinkedHashSet<>();
-
-            for (String id : disabledPickupRules) {
-                String normalized = normalizeOreId(id);
-
-                if (normalized == null) {
+                Rule cleaned = new Rule(r.trigger, source, item, r.enabled);
+                if (containsRule(normalized, cleaned)) {
                     dirty = true;
                     continue;
                 }
 
-                if (!normalizedDisabled.add(normalized)) {
-                    dirty = true;
-                }
+                normalized.add(cleaned);
             }
 
-            if (!new ArrayList<>(normalizedDisabled).equals(disabledPickupRules)) {
-                disabledPickupRules = new ArrayList<>(normalizedDisabled);
-                dirty = true;
-            }
+            rules = normalized;
         }
 
         if (animationEndBehavior == null) {
@@ -424,6 +373,36 @@ public class SpecialistDanceConfig {
         }
     }
     
+    public static final class Rule {
+        public String trigger;
+        public String source;
+        public String item;
+        public boolean enabled = true;
+
+        public Rule() {}
+
+        public Rule(String trigger, String source, String item, boolean enabled) {
+            this.trigger = trigger;
+            this.source = source == null ? "" : source;
+            this.item = item;
+            this.enabled = enabled;
+        }
+
+        public boolean requiresSource() {
+            return !"pickup".equals(trigger);
+        }
+
+        public boolean matches(String trigger, @Nullable String source, String item) {
+            return this.trigger.equals(trigger) 
+            && this.item.equals(item)
+            && (source == null || this.source.equals(source));
+        }
+
+        public String label() {
+            return source.isEmpty() ? item : source + " -> " + item;
+        }
+    } 
+
     public void save() {
         try {
             Files.createDirectories(PATH.getParent());

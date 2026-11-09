@@ -154,7 +154,7 @@ public class ItemGridScreen extends Screen {
                 ? "no item matches \"" + query + "\""
                 : (page + 1) + " / " + pageCount() + " · " + shown.size() + " items · scroll to page",
             MARGIN,
-            this.height - 17,
+            this.height - 44,
             0xFFA0A0A0
         );
     }

@@ -76,12 +76,16 @@ public class DanceLayoutScreen extends Screen {
 
     @Override 
     public boolean mouseClicked(@NonNull MouseButtonEvent event, boolean doubleClick) {
+        if (super.mouseClicked(event, doubleClick)) {
+            return true;
+        }
+
         if (event.button() == GLFW.GLFW_MOUSE_BUTTON_LEFT && currentPlacement().contains((int) event.x(), (int) event.y())) {
             dragging = true;
             return true;
         }
 
-        return super.mouseClicked(event, doubleClick);
+        return false;
     }
 
     @Override 
@@ -155,6 +159,14 @@ public class DanceLayoutScreen extends Screen {
             graphics.fill(placement.stageX() - 1, placement.stageY() + placement.stageHeight(), placement.stageX() + placement.stageWidth() + 1, placement.stageY() + placement.stageHeight() + 1, sc);
             graphics.fill(placement.stageX() - 1, placement.stageY(), placement.stageX(), placement.stageY() + placement.stageHeight(), sc);
             graphics.fill(placement.stageX() + placement.stageWidth(), placement.stageY(), placement.stageX() + placement.stageWidth() + 1, placement.stageY() + placement.stageHeight(), sc);
+        } else {
+            DanceRegistry.Dance dance = danceRegistry.find(config.activeDance);
+
+            if (dance.frameCount() <= 0) {
+                graphics.drawCenteredString(this.font, "No frames in \"" + dance.name() + "\"", this.width / 2, this.height / 2, 0xFFFF8080);
+            } else {
+                graphics.drawCenteredString(this.font, "Frames not loaded yet \"" + dance.name() + "\"", this.width / 2, this.height / 2, 0xFFFF8080);
+            }
         }
 
         graphics.fill(0, this.height - BAR_HEIGHT, this.width, this.height, 0x80000000);
