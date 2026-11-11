@@ -28,6 +28,7 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 
 public class SpecialistDanceConfigScreen extends Screen {
 
@@ -44,6 +45,14 @@ public class SpecialistDanceConfigScreen extends Screen {
         "mob - trigger when you kill this mob and pick up its drop",
         "container - trigger when you take this item from this container"
     );
+    private static final List<String> ANIMATION_HELP = List.of(
+        "stop - play the dance once, then clear the overlay",
+        "hold - freeze on the last frame until the music ends",
+        "loop - replay from the first frame while the music plays"
+    );
+    private static final String ANIMATION_HELP_MUSIC =
+        "hold and loop need music: with no track playing, both end after one pass";
+
     private static final Function<@NonNull String, Component> STRING_COMPONENT = Component::literal;
 
     private final SpecialistDanceConfig config;
@@ -60,8 +69,10 @@ public class SpecialistDanceConfigScreen extends Screen {
     private int paneBottom;
     private int rowsBottom;
     private int headerTop;
+    private int panelTop;
     private int paneTop;
     private int previewTop;
+    private int helpTop;
     private int previewBottom;
     private int cursor;
     private int listBottom;
@@ -97,11 +108,11 @@ public class SpecialistDanceConfigScreen extends Screen {
         contentX = left + SIDEBAR_WIDTH + PANE_GAP;
 
         headerTop = 8;
-        paneTop = headerTop + this.font.lineHeight + 6;
+        panelTop = headerTop + this.font.lineHeight + 3;
+        paneTop = panelTop + this.font.lineHeight + 5;
         sidebarTop = paneTop;
-        paneBottom = this.height - 8 - ROW_HEIGHT;
+        paneBottom = this.height - 26 - ROW_HEIGHT;
         listBottom = paneBottom - (hasList() ? ROW_HEIGHT + GAP : 0) - 4;
-        previewTop = paneTop;
         previewBottom = paneBottom - 4;
         cursor = paneTop;
 
@@ -114,6 +125,8 @@ public class SpecialistDanceConfigScreen extends Screen {
         }
 
         rowsBottom = cursor - GAP;
+        helpTop = rowsBottom + GAP + 2;
+        previewTop = helpTop + (category == 2 ? textBlockHeight(ANIMATION_HELP) + textBlockHeight(List.of(ANIMATION_HELP_MUSIC)) : 0) + GAP;
 
         addRenderableWidget(
             Button.builder(Component.literal("Done"), button -> onClose())
@@ -320,7 +333,7 @@ public class SpecialistDanceConfigScreen extends Screen {
         super.renderBackground(graphics, mouseX, mouseY, partialTick);
 
         graphics.fill(0, 0, this.width, this.height, 0x60000000);
-        graphics.fill(sidebarX - 6, paneTop - 20, contentX + contentWidth + 6, paneBottom + ROW_HEIGHT + 6, 0x80000000);
+        graphics.fill(sidebarX - 6, panelTop, contentX + contentWidth + 6, paneBottom + ROW_HEIGHT + 6, 0x80000000);
     }
 
     @Override
@@ -332,7 +345,7 @@ public class SpecialistDanceConfigScreen extends Screen {
         int step = ROW_HEIGHT + GAP;
         int dividerX = contentX - PANE_GAP / 2;
 
-        graphics.fill(dividerX, paneTop - 6, dividerX + 1, paneBottom, 0x40FFFFFF);
+        graphics.fill(dividerX, panelTop + this.font.lineHeight + 4, dividerX + 1, paneBottom, 0x40FFFFFF);
 
         for (int i = 0; i < CATEGORIES.size(); i++) {
             boolean active = i == category;
@@ -341,27 +354,34 @@ public class SpecialistDanceConfigScreen extends Screen {
                 this.font,
                 (active ? "> " : "  ") + CATEGORIES.get(i),
                 sidebarX + 4,
-                sidebarTop + i * step + 5,
+                sidebarTop + i * step + 5 + (ROW_HEIGHT - this.font.lineHeight) / 2,
                 active ? 0xFFFFFFFF : 0xFFA0A0A0
             );
         }
 
-        graphics.drawString(this.font, CATEGORIES.get(category), contentX, paneTop - 6, 0xFFB0B0B0);
+        graphics.drawString(this.font, CATEGORIES.get(category), contentX, panelTop + 3, 0xFFB0B0B0);
 
         if (category == 0) {
             DanceRegistry.Dance dance = danceRegistry.find(config.activeDance);
             String track = music.resolveTrackForDance(dance.name(), dance.track());
 
-            graphics.drawString(
-                this.font,
-                "gif used: " + dance.name() + " · track: " + track,
-                contentX,
+            drawTextBlock(
+                graphics,
+                List.of("gif used: " + dance.name() + " · track: " + track),
                 listBottom + GAP + ROW_HEIGHT + GAP,
                 0xFFB0B0B0
             );
         }
 
         if (category == 2) {
+            int active = SpecialistDanceConfig.ANIMATION_END_BEHAVIORS.indexOf(config.animationEndBehavior);
+            int helpY = helpTop;
+
+            for (int i = 0; i < ANIMATION_HELP.size(); i++) {
+                helpY = drawTextBlock(graphics, List.of(ANIMATION_HELP.get(i)), helpY, i == active ? 0xFFFFFFFF : 0xFFA0A0A0);
+            }
+
+            drawTextBlock(graphics, List.of(ANIMATION_HELP_MUSIC), helpY, 0xFF909090);
             drawDancePreview(graphics);
         }
 
@@ -378,13 +398,36 @@ public class SpecialistDanceConfigScreen extends Screen {
                 contentX, rowsBottom + GAP + 2, 0xFFB0B0B0
             );
 
-            int y = rowsBottom + GAP + 14;
-
-            for (String line : RULE_HELP) {
-                graphics.drawString(this.font, line, contentX, y, 0xFFA0A0A0);
-                y += this.font.lineHeight + 2;
-            }
+            drawTextBlock(graphics, RULE_HELP, rowsBottom + GAP + 14, 0xFFA0A0A0);
         }
+    }
+
+    private int drawTextBlock(GuiGraphics graphics, List<String> lines, int y, int color) {
+        int lastLine = paneBottom - this.font.lineHeight;
+
+        for (String line : lines) {
+            for (FormattedCharSequence wrapped : this.font.split(Component.literal(line), contentWidth)) {
+                if (y > lastLine) {
+                    return y;
+                }
+
+                graphics.drawString(this.font, wrapped, contentX, y, color);
+                y += this.font.lineHeight + 1;
+            }
+
+            y += 2;
+        }
+
+        return y;
+    }
+
+    private int textBlockHeight(List<String> lines) {
+        int height = 0;
+
+        for (String line : lines) {
+            height += this.font.split(Component.literal(line), contentWidth).size() * (this.font.lineHeight + 1) + 2;
+        }
+        return height;
     }
 
     private void drawDancePreview(GuiGraphics graphics) {
@@ -457,7 +500,8 @@ public class SpecialistDanceConfigScreen extends Screen {
                 String selected,
                 Consumer<String> onPick,
                 boolean showDanceMetadata) {
-            super(SpecialistDanceConfigScreen.this.minecraft, width, height, x, y);
+            super(SpecialistDanceConfigScreen.this.minecraft, width, height, y, ROW_HEIGHT);
+            setX(x);
             this.onPick = onPick;
 
             for (String name : names) {

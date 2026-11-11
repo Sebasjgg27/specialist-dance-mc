@@ -225,6 +225,11 @@ public class SpecialistDanceConfig {
         dirty = true;
     }
 
+    public void clearRules() {
+        rules = new ArrayList<>();
+        dirty = true;
+    }
+
     public boolean addRule(@Nullable String rawTrigger, @Nullable String rawSource, @Nullable String rawItem) {
 
         if (rawTrigger == null || !RULE_TRIGGERS.contains(rawTrigger)) return false;

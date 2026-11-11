@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -20,21 +22,33 @@ import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.SpawnEggItem;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.EntityBlock;
+import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
 
 import org.lwjgl.glfw.GLFW;
 
 public class OreTriggersScreen extends Screen {
     private static final int ROW_HEIGHT = 20;
+    private static final int BUBBLE_SLOT = 18;
+    private static final int BUBBLE_PAD = 4;
+    private static final int BUBBLE_H = BUBBLE_SLOT + BUBBLE_PAD * 2;
 
     private final SpecialistDanceConfig config;
     private final Screen parent;
 
-    private final List<String> blockIds;
+    private final List<String> minedSourceIds;
+    private final List<String> containerSourceIds;
     private final List<String> itemIds;
     private final List<String> mobIds;
 
@@ -51,21 +65,61 @@ public class OreTriggersScreen extends Screen {
     private int listX;
     private int listWidth;
     private int actionTop;
+    private int bubbleBottom;
     private @Nullable String notice;
 
     public OreTriggersScreen(SpecialistDanceConfig config, Screen parent) {
         super(Component.literal("Your rules"));
         this.config = config;
         this.parent = parent;
-        this.blockIds = sortedIds(BuiltInRegistries.BLOCK);
-        this.itemIds = sortedIds(BuiltInRegistries.ITEM);
-        this.mobIds = sortedIds(BuiltInRegistries.ENTITY_TYPE);
+        this.minedSourceIds = sortedBlocks(block -> block.asItem() != Items.AIR);
+        this.containerSourceIds = sortedBlocks(block ->
+            block instanceof EntityBlock entityBlock
+                && entityBlock.newBlockEntity(BlockPos.ZERO, block.defaultBlockState())
+                    instanceof RandomizableContainerBlockEntity);
+        this.mobIds = sortedMobs();
+        this.itemIds = sortedIds(BuiltInRegistries.ITEM).stream().filter(id -> !"minecraft:air".equals(id)).toList();
+    }
+
+    private static List<String> sortedMobs() {
+        List<String> ids = new ArrayList<>();
+
+        for (EntityType<?> type : BuiltInRegistries.ENTITY_TYPE) {
+            if (type.getCategory() == MobCategory.MISC || SpawnEggItem.byId(type) == null) {
+                continue;
+            }
+            Identifier id = BuiltInRegistries.ENTITY_TYPE.getKey(type);
+
+            if (id != null) {
+                ids.add(id.toString());
+            }
+        }
+        ids.sort(Comparator.naturalOrder());
+        return List.copyOf(ids);
     }
 
     private static <T> List<String> sortedIds(Registry<T> registry) {
         List<Identifier> ids = new ArrayList<>(registry.keySet());
         ids.sort(Comparator.comparing(Identifier::toString));
         return ids.stream().map(Identifier::toString).toList();
+    }
+
+    private static List<String> sortedBlocks(Predicate<Block> keep) {
+        List<String> ids = new ArrayList<>();
+
+        for (Block block : BuiltInRegistries.BLOCK) {
+            if (!keep.test(block)) {
+                continue;
+            }
+
+            Identifier id = BuiltInRegistries.BLOCK.getKey(block);
+
+            if(id != null) {
+                ids.add(id.toString());
+            }
+        }
+        ids.sort(Comparator.naturalOrder());
+        return List.copyOf(ids);
     }
 
     private boolean requiresSource() {
@@ -92,6 +146,7 @@ public class OreTriggersScreen extends Screen {
         int itemTop = actionTop - 20;
         int sourceTop = itemTop - 20;
         int triggerTop = sourceTop - 22;
+        bubbleBottom = triggerTop - 3;
         int listHeight = Math.max(24, triggerTop - 6 - 40);
 
         addRenderableWidget(new RuleList(this.minecraft, listWidth, listHeight, listX, 40));
@@ -173,6 +228,18 @@ public class OreTriggersScreen extends Screen {
         );
 
         addRenderableWidget(
+            Button.builder(Component.literal("Clear"), button -> {
+                config.clearRules();
+                sourceText = "";
+                itemText = "";
+                notice = null;
+                rebuildWidgets();
+            })
+                .bounds(listX + 202, actionTop, 56, 18)
+                .build()
+        );
+
+        addRenderableWidget(
             Button.builder(Component.literal("Done"), button -> onClose())
                 .bounds(this.width / 2 - 100, doneTop, 200, 20)
                 .build()
@@ -188,7 +255,42 @@ public class OreTriggersScreen extends Screen {
     }
 
     private List<String> sourceRegistry() {
-        return "mob".equals(trigger) ? mobIds : blockIds;
+        return switch (trigger) {
+            case "mob" -> mobIds;
+            case "container" -> containerSourceIds;
+            default -> minedSourceIds;
+        };
+    }
+
+    private static @NonNull ItemStack mobStackOf(@NonNull String id) {
+        Identifier parsed = Identifier.tryParse(id);
+
+        if (parsed == null || !BuiltInRegistries.ENTITY_TYPE.containsKey(parsed)) {
+            return ItemStack.EMPTY;
+        }
+
+        SpawnEggItem egg = SpawnEggItem.byId(BuiltInRegistries.ENTITY_TYPE.getValue(parsed));
+
+        return egg == null ? ItemStack.EMPTY : new ItemStack(egg);
+    }
+
+    private static @NonNull ItemStack previewStack(
+            @Nullable String typed,
+            @Nullable String ghost,
+            Function<String, @NonNull ItemStack> resolver) {
+        for (String candidate : new String[] {typed, ghost}) {
+            if (candidate == null || candidate.isBlank()) {
+                continue;
+            }
+
+            ItemStack stack = resolver.apply(candidate);
+
+            if (!stack.isEmpty()) {
+                return stack;
+            }
+        }
+
+        return ItemStack.EMPTY;
     }
 
     private static @Nullable String ghost(EditBox box, List<String> ids, String typed) {
@@ -241,14 +343,59 @@ public class OreTriggersScreen extends Screen {
 
         graphics.drawCenteredString(this.font, this.title, this.width / 2, 16, 0xFFFFFFFF);
 
-        String hint = config.rules.isEmpty()
-            ? "No rules yet - add one below"
-            : "Click toggles · right-click deletes · Tab accepts ghost";
+        String hint = notice != null
+            ? notice
+            : config.rules.isEmpty()
+                ? "No rules yet - add one below"
+                : "Click toggles - right-click deletes - Tab accepts ghost";
 
-        graphics.drawCenteredString(this.font, hint, this.width / 2, 25, 0xFFA0A0A0);
+        graphics.drawCenteredString(this.font, hint, this.width / 2, 25, notice != null ? 0xFFFF7070 : 0xFFA0A0A0);
 
-        if (notice != null) {
-            graphics.drawString(this.font, notice, listX + 142, actionTop + 6, 0xFFFF7070);
+        drawBubblePreview(graphics);
+    }
+
+    private void drawBubblePreview(@NonNull GuiGraphics graphics) {
+        Function<String, @NonNull ItemStack> sourceResolver = "mob".equals(trigger)
+            ? OreTriggersScreen::mobStackOf
+            : ItemGridScreen::stackOf;
+
+        ItemStack source = requiresSource()
+            ? previewStack(sourceText, sourceMatch, sourceResolver)
+            : ItemStack.EMPTY;
+        ItemStack drop = previewStack(itemText, itemMatch, ItemGridScreen::stackOf);
+
+        if (source.isEmpty() && drop.isEmpty()) {
+            return;
+        }
+
+        String arrow = source.isEmpty() || drop.isEmpty() ? "" : "->";
+        int arrowWidth = arrow.isEmpty() ? 0 : this.font.width(arrow) + 6;
+        int width = BUBBLE_PAD * 2
+            + (source.isEmpty() ? 0 : BUBBLE_SLOT)
+            + (drop.isEmpty() ? 0 : BUBBLE_SLOT)
+            + arrowWidth;
+
+        int left = this.width / 2 - width / 2;
+        int top = bubbleBottom - BUBBLE_H;
+        int iconY = top + BUBBLE_PAD;
+        int x = left + BUBBLE_PAD;
+
+        graphics.fill(left, top, left + width, bubbleBottom, 0xC0000000);
+        graphics.renderOutline(left, top, width, BUBBLE_H, 0x40FFFFFF);
+        graphics.fill(this.width / 2 - 2, bubbleBottom, this.width / 2 + 2, bubbleBottom + 3, 0xC0000000);
+
+        if (!source.isEmpty()) {
+            graphics.renderItem(source, x, iconY);
+            x += BUBBLE_SLOT;
+        }
+
+        if (!arrow.isEmpty()) {
+            graphics.drawString(this.font, arrow, x, top + BUBBLE_H / 2 - this.font.lineHeight / 2, 0xFFB0B0B0);
+            x += arrowWidth;
+        }
+
+        if (!drop.isEmpty()) {
+            graphics.renderItem(drop, x, iconY);
         }
     }
 
