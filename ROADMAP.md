@@ -3,10 +3,10 @@
 > Living document. Update it whenever a phase changes state.
 > If this file and the code disagree, the code wins and this file is wrong.
 
-**Latest stable:** `v1.6.2` (2026-11-14) — two build variants: `full` carries the bundled dance and track, `lite` ships the mod only, and both handle a machine with no content installed
+**Latest stable:** `v1.6.2` (2026-11-14, tagged `8bb029e`) — two build variants: `full` carries the bundled dance and track, `lite` ships the mod only, and both handle a machine with no content installed
 **Previous:** `v1.6.0` (2026-11-14, tagged `8e40558`) · `v1.6.1` never became stable — the same content went out first as the `v1.6.1-rc1` pre-release
 **In verification:** nothing
-**Branch:** `main` · **History:** 39 commits, 2026-10-10 → 2026-11-14 (35 days)
+**Branch:** `main` · **History:** 40 commits, 2026-10-10 → 2026-11-14 (35 days)
 
 ## What this project is
 
