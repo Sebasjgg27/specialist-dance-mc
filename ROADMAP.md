@@ -400,6 +400,12 @@ Anything 🛠 at release time sits here until it is 🧪.
       deleted (`Files.list` cannot yield one name twice); nothing to observe.
 - [x] 🛠 The layout screen and folder/Rescan buttons exist only in the working tree —
       committed and tagged in `v1.4.0`.
+- [x] 🧪 Closed by `v1.6.0` (`4287ce0`): `ORE_PATH` excluded `_`, so `normalizeOreId()` returned
+      `null` for nearly every vanilla id and `sanitize()` deleted the rule at load — which took
+      all ten presets away on every launch. Found in-game 2026-11-12 when a `mob` rule refused
+      to save; with the underscore allowed, a rule authored in the editor survived a save and a
+      reload and fired — `activated for mob death at BlockPos{x=12, y=119, z=2}` (19:33:10) and
+      `activated for container minecraft:chest` (19:34:03) (`run/logs/2026-11-12-3.log.gz`).
 - [ ] `music ended while looping` has never been logged: `loop` × music on is proven to
       wrap, but its end path has no observation.
 - [ ] The **Position dance** screen has never been observed dragging or zooming a dance;
