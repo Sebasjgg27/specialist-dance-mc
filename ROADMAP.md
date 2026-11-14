@@ -3,8 +3,8 @@
 > Living document. Update it whenever a phase changes state.
 > If this file and the code disagree, the code wins and this file is wrong.
 
-**Latest release:** `v1.5.0` (2026-11-01, tagged `79c3907`) · **Releasing now:** `v1.6.0` Phases 7 + 8, on branch `v1.6.0`
-**Branch:** `v1.6.0` · **History:** 31 commits, 2026-10-10 → 2026-11-14 (35 days)
+**Latest release:** `v1.6.0` (2026-11-14, tagged `8e40558`) · **In verification:** none — Phase 9 is `v1.8.0` and not started
+**Branch:** `v1.6.0` · **History:** 33 commits, 2026-10-10 → 2026-11-14 (35 days)
 
 ## What this project is
 
