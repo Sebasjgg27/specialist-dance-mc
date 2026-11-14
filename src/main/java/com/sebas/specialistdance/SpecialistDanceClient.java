@@ -709,6 +709,13 @@ public class SpecialistDanceClient implements ClientModInitializer {
     }
 
     public void triggerDance() {
+        DanceRegistry.Dance dance = danceRegistry.find(config.activeDance);
+
+        if (dance.frameCount() <= 0) {
+            log("Specialist Dance: no dance pack available, trigger skipped");
+            return;
+        }
+
         long now = System.currentTimeMillis();
 
         if (config.cooldownMs > 0
@@ -720,7 +727,6 @@ public class SpecialistDanceClient implements ClientModInitializer {
         lastTriggerMillis = now;
         animationStartMillis = now;
 
-        DanceRegistry.Dance dance = danceRegistry.find(config.activeDance);
         playingDance = dance;
         String track = config.musicEnabled
             ? musicManager.resolveTrackForDance(dance.name(), dance.track())

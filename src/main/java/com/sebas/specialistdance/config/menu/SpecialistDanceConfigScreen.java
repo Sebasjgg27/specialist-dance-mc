@@ -53,6 +53,19 @@ public class SpecialistDanceConfigScreen extends Screen {
     private static final String ANIMATION_HELP_MUSIC =
         "hold and loop need music: with no track playing, both end after one pass";
 
+    private static final List<String> NO_TRACKS_HINT = List.of(
+        "No tracks yet.",
+        "Put .ogg, .wav, .aiff, .au, .mp3 or .flac files",
+        "into config/specialist-dance/music/ and press",
+        "Rescan in Content."
+    );
+    private static final List<String> NO_DANCES_HINT = List.of(
+        "No dance packs yet.",
+        "Drop a .gif or a folder of frame_000.png files",
+        "into config/specialist-dance/dances/ and press",
+        "Rescan in Content."
+    );
+
     private static final Function<@NonNull String, Component> STRING_COMPONENT = Component::literal;
 
     private final SpecialistDanceConfig config;
@@ -75,6 +88,7 @@ public class SpecialistDanceConfigScreen extends Screen {
     private int helpTop;
     private int previewBottom;
     private int cursor;
+    private int listTop;
     private int listBottom;
     private boolean hasList() {
         return category == 0 || category == 1;
@@ -138,7 +152,7 @@ public class SpecialistDanceConfigScreen extends Screen {
     private void addMusicRows() {
         List<String> tracks = music.getAvailableTracks();
 
-        if (!tracks.contains(config.musicTrack)) {
+        if (!tracks.isEmpty() && !tracks.contains(config.musicTrack)) {
             config.musicTrack = tracks.get(0);
         }
 
@@ -158,14 +172,15 @@ public class SpecialistDanceConfigScreen extends Screen {
         int half = (contentWidth - 10) / 2;
         int previewRow = nextRow();
 
-        addRenderableWidget(
-            Button.builder(Component.literal("Play preview"), button -> {
+        Button preview = Button.builder(Component.literal("Play preview"), button -> {
                 DanceRegistry.Dance dance = danceRegistry.find(config.activeDance);
                 music.play(music.resolveTrackForDance(dance.name(), dance.track()));
             })
                 .bounds(contentX, previewRow, half, ROW_HEIGHT)
-                .build()
-        );
+                .build();
+
+        preview.active = !tracks.isEmpty();
+        addRenderableWidget(preview);
 
         addRenderableWidget(
             Button.builder(Component.literal("Stop"), button -> music.stop())
@@ -173,14 +188,18 @@ public class SpecialistDanceConfigScreen extends Screen {
                 .build()
         );
 
-        addRenderableWidget(
-            new NameList(
-                contentX, cursor, contentWidth, listBottom - cursor,
-                tracks, config.musicTrack,
-                name -> config.musicTrack = name,
-                false
-            )
-        );
+        listTop = cursor;
+
+        if (!tracks.isEmpty()) {
+            addRenderableWidget(
+                new NameList(
+                    contentX, cursor, contentWidth, listBottom - cursor,
+                    tracks, config.musicTrack,
+                    name -> config.musicTrack = name,
+                    false
+                )
+            );
+        }
 
         addRenderableWidget(
             Button.builder(Component.literal("Open music folder"), button -> openFolder("music"))
@@ -193,34 +212,40 @@ public class SpecialistDanceConfigScreen extends Screen {
     private void addDanceRows() {
         List<String> dances = danceRegistry.getAvailableDances();
 
-        if (!dances.contains(config.activeDance)) {
+        if (!dances.isEmpty() && !dances.contains(config.activeDance)) {
             config.activeDance = dances.get(0);
         }
 
-        addRenderableWidget(
-            Button.builder(Component.literal("Preview dance on close"), button -> previewDance = true)
-                .bounds(contentX, nextRow(), contentWidth, ROW_HEIGHT)
-                .build()
-        );
+        Button previewButton = Button.builder(Component.literal("Preview dance on close"), button -> previewDance = true)
+            .bounds(contentX, nextRow(), contentWidth, ROW_HEIGHT)
+            .build();
 
-        addRenderableWidget(
-            Button.builder(Component.literal("Position dance"), button -> 
-                minecraft.setScreen(new DanceLayoutScreen(
-                    config, danceRegistry, 
-                    SpecialistDanceClient.getInstance().getDanceTextures(), this))
-            )
-                .bounds(contentX, nextRow(), contentWidth, ROW_HEIGHT)
-                .build()
-        );
+        previewButton.active = !dances.isEmpty();
+        addRenderableWidget(previewButton);
 
-        addRenderableWidget(
-            new NameList(
-                contentX, cursor, contentWidth, listBottom - cursor,
-                dances, config.activeDance,
-                name -> config.activeDance = name,
-                true
-            )
-        );
+        Button positionButton = Button.builder(Component.literal("Position dance"), button ->
+            minecraft.setScreen(new DanceLayoutScreen(
+                config, danceRegistry,
+                SpecialistDanceClient.getInstance().getDanceTextures(), this))
+        )
+            .bounds(contentX, nextRow(), contentWidth, ROW_HEIGHT)
+            .build();
+
+        positionButton.active = !dances.isEmpty();
+        addRenderableWidget(positionButton);
+
+        listTop = cursor;
+
+        if (!dances.isEmpty()) {
+            addRenderableWidget(
+                new NameList(
+                    contentX, cursor, contentWidth, listBottom - cursor,
+                    dances, config.activeDance,
+                    name -> config.activeDance = name,
+                    true
+                )
+            );
+        }
     }
 
     private void addAnimationRows() {
@@ -367,10 +392,18 @@ public class SpecialistDanceConfigScreen extends Screen {
 
             drawTextBlock(
                 graphics,
-                List.of("gif used: " + dance.name() + " · track: " + track),
+                List.of("gif used: " + dance.name() + " · track: " + (track == null ? "none" : track)),
                 listBottom + GAP + ROW_HEIGHT + GAP,
                 0xFFB0B0B0
             );
+
+            if (music.getAvailableTracks().isEmpty()) {
+                drawTextBlock(graphics, NO_TRACKS_HINT, listTop, 0xFFB0B0B0);
+            }
+        }
+
+        if (category == 1 && danceRegistry.getAvailableDances().isEmpty()) {
+            drawTextBlock(graphics, NO_DANCES_HINT, listTop, 0xFFB0B0B0);
         }
 
         if (category == 2) {

@@ -42,6 +42,7 @@ public class MusicManager {
 
     private static final String BUNDLED_NAME = "default";
     private static final String BUNDLED_RESOURCE = "/assets/specialist-dance/sounds/default.ogg";
+    private static final boolean BUNDLED_PRESENT = MusicManager.class.getResource(BUNDLED_RESOURCE) != null;
 
     private static final Set<String> SUPPORTED_EXTENSIONS = Set.of("ogg", "wav", "aiff", "aif", "au", "mp3", "flac");
     private static final Set<String> UNSUPPORTED_AUDIO_EXTENSIONS = Set.of(
@@ -164,7 +165,11 @@ public class MusicManager {
 
     public List<String> getAvailableTracks() {
         List<String> tracks = new ArrayList<>();
-        tracks.add(BUNDLED_NAME);
+
+        if (BUNDLED_PRESENT) {
+            tracks.add(BUNDLED_NAME);
+        }
+
         tracks.addAll(userTracks.keySet());
         return tracks;
     }
@@ -256,7 +261,12 @@ public class MusicManager {
         }
 
         String auto = firstPackTrack(danceName);
-        return auto != null ? auto : BUNDLED_NAME;
+
+        if (auto != null) {
+            return auto;
+        }
+
+        return BUNDLED_PRESENT ? BUNDLED_NAME : null;
     }
 
     private String resolvePackTrack(String danceName, String packTrack) {
@@ -286,8 +296,13 @@ public class MusicManager {
         }
 
         String requested = trackName == null || trackName.isBlank()
-            ? BUNDLED_NAME
+            ? (BUNDLED_PRESENT ? BUNDLED_NAME : null)
             : trackName;
+
+        if (requested == null) {
+            log("no track available");
+            return;
+        }
 
         if (!ensureTrackLoaded(requested)) {
             log("track '" + requested + "' not found, trying default");

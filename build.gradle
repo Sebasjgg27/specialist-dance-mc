@@ -14,8 +14,11 @@ repositories {
     }
 }
 
+def modVariant = (findProperty('modVariant') ?: 'full') as String
+def variantSuffix = modVariant == 'full' ? '' : '_' + modVariant
+
 base {
-    archivesName.set(project.archives_base_name)
+    archivesName.set("${project.archives_base_name}-${project.minecraft_version}-fabric${variantSuffix}".toString())
 }
 
 dependencies {
@@ -37,6 +40,12 @@ dependencies {
 
 processResources {
     inputs.property "version", project.version
+    inputs.property "variant", modVariant
+
+    if (modVariant == 'lite') {
+        exclude 'assets/specialist-dance/textures/gui/frames/**'
+        exclude 'assets/specialist-dance/sounds**'
+    }
 
     filesMatching("fabric.mod.json") {
         expand "version": project.version

@@ -62,6 +62,9 @@ public class DanceRegistry {
     }
 
     private static final Dance BUNDLED = new Dance("specialist", null, 147, null);
+    private static final String BUNDLED_PROBE = "/assets/specialist-dance/textures/gui/frames/frame_000.png";
+    private static final boolean BUNDLED_PRESENT = DanceRegistry.class.getResource(BUNDLED_PROBE) != null; 
+    private static final Dance NO_DANCE = new Dance("none", null, 0, null);   
 
     private final Map<String, Dance> userDances = new TreeMap<>();
     private final SpecialistDanceConfig config;
@@ -489,18 +492,22 @@ public class DanceRegistry {
 
     public List<String> getAvailableDances() {
         List<String> names = new ArrayList<>();
-        names.add(BUNDLED.name());
+
+        if (BUNDLED_PRESENT) {
+            names.add(BUNDLED.name());
+        }
+
         names.addAll(userDances.keySet());
         return names;
     }
 
     public Dance find(String name) {
-        if (BUNDLED.name().equals(name)) {
+        if (BUNDLED_PRESENT && BUNDLED.name().equals(name)) {
             return BUNDLED;
         }
 
         Dance dance = userDances.get(name);
-        return dance == null ? BUNDLED : dance;
+        return dance != null ? dance : userDances.values().stream().findFirst().orElse(NO_DANCE);
     }
 
     private void log(String message) {
