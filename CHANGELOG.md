@@ -1,5 +1,41 @@
 # Changelog
 
+## 1.6.1-rc1
+
+Two release artifacts + empty-content safety. `./gradlew build` produces the GitHub jar with the
+bundled `specialist` dance and the `default` track; `-PmodVariant=lite` produces the
+CurseForge/Modrinth jar without them, so content is not shipped twice.
+
+- Added: the `modVariant` build property — `full` (default) keeps all 147 bundled frames and the
+  bundled `.ogg`, `lite` excludes them in `processResources`.
+- Added: the jar name carries the Minecraft version, the loader and the variant —
+  `specialist-dance-1.21.11-fabric-1.6.1-rc1.jar` and
+  `specialist-dance-1.21.11-fabric_lite-1.6.1-rc1.jar`.
+- Added: `DanceRegistry.NO_DANCE` — a zero-frame `none` sentinel, so `find()` still answers when
+  nothing is installed and no caller has to null-check.
+- Added: the **Music** and **Dance** panes say which folder to drop files into when their list is
+  empty.
+- Changed: the bundled dance and track are detected at runtime by a resource probe
+  (`frame_000.png`, `default.ogg`) instead of assumed, so each build only offers what it ships.
+- Changed: `processResources` takes the variant as a task input, so a cached task cannot hand back
+  the wrong content set.
+- Fixed: `DanceRegistry.find()` answered any unknown `activeDance` with the bundled dance — a
+  147-frame animation with no frames on disk in a content-less build. It now falls back to the
+  first installed pack, then to `none`.
+- Fixed: `MusicManager.resolveTrackForDance()` returned `default` when nothing matched, so a
+  content-less build logged a failed load on every trigger; it now reports no track and `play()`
+  stops with `no track available`.
+- Fixed: the **K** menu crashed with `IndexOutOfBoundsException` while building the Music or Dance
+  pane on a machine with no tracks or packs; **Play preview**, **Preview dance on close** and
+  **Position dance** are greyed out in that state instead.
+- Fixed: `triggerDance()` wrote `lastTriggerMillis` before it knew a dance existed, so with no
+  pack installed a trigger burned its cooldown on an animation that could not draw.
+- Known: the lite jar has only run as a dev client (`./gradlew runClient -PmodVariant=lite`, which
+  uses the same excluded resource set); a production `mods/` install has not been observed.
+- Known: the empty state — no packs and no tracks at all — has never been seen in-game, so the
+  hints and the `no dance pack available, trigger skipped` line are unproven.
+- Known: the `pickup` trigger still has no activation line in any log.
+
 ## 1.6.0
 
 Your rules + animation speed + Mod Menu. The dance now fires on rules you write — mine a

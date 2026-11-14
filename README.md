@@ -57,8 +57,18 @@ then holds an empty list, which nothing re-seeds.
 
 1. Install [Fabric Loader](https://fabricmc.net/use/installer/) for 1.21.11
    and **Fabric API**.
-2. Drop `specialist-dance-1.6.0.jar` into your `mods/` folder.
+2. Drop `specialist-dance-1.21.11-fabric-1.6.1-rc1.jar` into your `mods/` folder.
 3. Launch the game — you should see `Specialist Dance is Ready!` in the log.
+
+Two artifacts ship, and only the first one carries content:
+
+| Jar | Contains | Needs |
+|---|---|---|
+| `specialist-dance-1.21.11-fabric-1.6.1-rc1.jar` | the bundled `specialist` dance (147 frames) and the `default` track | nothing |
+| `specialist-dance-1.21.11-fabric_lite-1.6.1-rc1.jar` | the mod only | your own dance pack and track in the config folders |
+
+The mod is otherwise identical. With the lite jar and nothing installed yet, the **K** menu says
+which folder to drop files into instead of offering a dance that cannot play.
 
 The mod does not need to be installed on the server.
 
@@ -327,9 +337,11 @@ screen, or check that the animation is actually finishing.
 Prerequisites: JDK 21 and Git. Gradle is included in the repo.
 
 ```sh
-./gradlew build          # jar lands in build/libs/
-./gradlew runClient      # launch a dev client
-./gradlew build --offline  # when your dependencies are already cached
+./gradlew build                          # full jar lands in build/libs/
+./gradlew build -PmodVariant=lite        # same, without the bundled dance and track
+./gradlew runClient                      # launch a dev client
+./gradlew runClient -PmodVariant=lite    # dev client as the lite build ships
+./gradlew build --offline                # when your dependencies are already cached
 ```
 
 The first build needs network access to Fabric's Maven and Mojang's version

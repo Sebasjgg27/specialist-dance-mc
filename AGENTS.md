@@ -14,12 +14,15 @@ Client-only Fabric mod for Minecraft 1.21.11. It plays a 147-frame dance overlay
 ## Commands
 
 ```bash
-./gradlew build        # compile + jar in build/libs/
-./gradlew runClient    # dev client
-./gradlew compileJava  # fast compile check
+./gradlew build                          # full jar (bundled dance + track) in build/libs/
+./gradlew build -PmodVariant=lite        # lite jar, ships without bundled content
+./gradlew runClient                      # dev client
+./gradlew runClient -PmodVariant=lite    # dev client as the lite build ships
+./gradlew compileJava                    # fast compile check
 ```
 
 - There are **no automated tests** (`test` is `NO-SOURCE`); validation is `./gradlew build` plus in-game QA.
+- Every release builds **both** variants; `full` goes to GitHub, `lite` goes to CurseForge/Modrinth.
 - Always use the bundled wrapper, target Java 21 (Gradle toolchain handles it; the machine default JDK may be newer).
 - If a stale `~/.gradle/caches/fabric-loom/*.lock` contains `disowned`, delete it and let the next build rebuild the Loom cache.
 
@@ -103,6 +106,14 @@ Client-only Fabric mod for Minecraft 1.21.11. It plays a 147-frame dance overlay
 - `onInitializeClient()` returns early when `config.enabled` is false, **before** `musicManager` is constructed. `getModConfigScreenFactory()` must null-guard `getMusicManager()` too, or Mod Menu's Config button throws an NPE in `init()`; returning `null` is Mod Menu's "no config screen" signal.
 - `modCompileOnly` keeps ModMenu off the dev runtime classpath, so the entrypoint is dead code in `runClient`. `modRuntimeOnly` is also declared so the integration is actually exercisable in the dev client without shipping ModMenu as a dependency.
 
+### Build variants
+
+- `modVariant` is build-time only — nothing about it reaches the jar. The code detects content with a resource probe (`DanceRegistry.BUNDLED_PRESENT` on `frame_000.png`, `MusicManager.BUNDLED_PRESENT` on `default.ogg`). Do not add a generated flag, a `fabric.mod.json` field or a config key for it.
+- `base.archivesName` must **not** contain `mod_version`: Gradle appends the project version. It carries `minecraft_version` and `fabric` so a file name states its target.
+- `processResources` takes `inputs.property "variant"`, so switching variants invalidates the cache. A jar with the wrong content set means an exclude pattern broke, not the fingerprint.
+- `DanceRegistry.find()` must stay total: it answers with the zero-frame `NO_DANCE` instead of `null` or a bundled dance that is not in the jar, which is what keeps every caller free of null checks. A caller that assumes `frameCount() > 0` re-opens the lite crash.
+- On a lite install with no packs, `getAvailableDances()` and `getAvailableTracks()` are empty; guard `get(0)` before building a `NameList`, and never let a trigger write `lastTriggerMillis` before a dance is known.
+
 ## Release process
 
-Follow `ROADMAP.md`: one release per phase. Update `mod_version` in `gradle.properties`, add a `CHANGELOG.md` entry, update `README.md`, mark the phase complete in `ROADMAP.md`, run `./gradlew build`, test in-game in **Survival**, and only then tag.
+Follow `ROADMAP.md`: one release per phase. Update `mod_version` in `gradle.properties`, add a `CHANGELOG.md` entry, update `README.md`, mark the phase complete in `ROADMAP.md`, run `./gradlew build` **and** `./gradlew build -PmodVariant=lite`, test in-game in **Survival**, and only then tag.
