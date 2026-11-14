@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Function;
 import java.util.function.Consumer;
 
 import org.jspecify.annotations.NonNull;
@@ -26,6 +27,7 @@ public class ItemGridScreen extends Screen {
     private static final int FOOTER = 30;
 
     private final Screen parent;
+    private final Function<@NonNull String, @NonNull ItemStack> iconOf;
     private final Consumer<@NonNull String> onPick;
     private final List<@NonNull Identifier> allIds = new ArrayList<>();
     private final List<@NonNull Identifier> shown = new ArrayList<>();
@@ -40,12 +42,36 @@ public class ItemGridScreen extends Screen {
             Component title,
             @NonNull String initialQuery,
             Consumer<@NonNull String> onPick) {
+        this(
+            parent,
+            title,
+            initialQuery,
+            BuiltInRegistries.ITEM.keySet().stream().map(Identifier::toString).sorted().toList(),
+            ItemGridScreen::stackOf,
+            onPick
+        );
+    }
+
+    public ItemGridScreen(
+            Screen parent,
+            Component title,
+            @NonNull String initialQuery,
+            List<@NonNull String> candidateIds,
+            Function<@NonNull String, @NonNull ItemStack> iconOf,
+            Consumer<@NonNull String> onPick) {
         super(title);
         this.parent = parent;
+        this.iconOf = iconOf;
         this.onPick = onPick;
         this.query = initialQuery;
 
-        allIds.addAll(BuiltInRegistries.ITEM.keySet());
+        for (String id : candidateIds) {
+            Identifier parsed = Identifier.tryParse(id);
+
+            if (parsed != null) {
+                allIds.add(parsed);
+            }
+        }
         allIds.sort(Comparator.comparing(Identifier::toString));
     }
 
@@ -133,7 +159,7 @@ public class ItemGridScreen extends Screen {
 
             graphics.fill(x, y, x + SLOT, y + SLOT, isHovered ? 0x80FFFFFF : 0x40000000);
 
-            ItemStack stack = stackOf(shown.get(index).toString());
+            ItemStack stack = iconOf.apply(shown.get(index).toString());
 
             if (!stack.isEmpty()) {
                 graphics.renderItem(stack, x + 1, y + 1);
@@ -151,8 +177,8 @@ public class ItemGridScreen extends Screen {
         graphics.drawString(
             this.font,
             shown.isEmpty()
-                ? "no item matches \"" + query + "\""
-                : (page + 1) + " / " + pageCount() + " · " + shown.size() + " items · scroll to page",
+                ? "no match for \"" + query + "\""
+                : (page + 1) + " / " + pageCount() + " · " + shown.size() + " entries - scroll to page",
             MARGIN,
             this.height - 44,
             0xFFA0A0A0

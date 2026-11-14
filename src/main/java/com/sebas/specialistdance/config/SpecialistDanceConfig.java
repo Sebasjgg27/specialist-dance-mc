@@ -4,7 +4,9 @@ import java.io.IOException;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -26,8 +28,12 @@ public class SpecialistDanceConfig {
     private static final int CURRENT_VERSION = 4;
 
     private static final Pattern ORE_NAMESPACE = Pattern.compile("[a-z0-9_.-]+");
-    private static final Pattern ORE_PATH = Pattern.compile("[a-z0-9/.-]+");
+    private static final Pattern ORE_PATH = Pattern.compile("[a-z0-9/_.-]+");
     private transient boolean dirty;
+
+    private static final int HISTORY_LIMIT = 40;
+    private transient Deque<List<Rule>> undoStack = new ArrayDeque<>();
+    private transient Deque<List<Rule>> redoStack = new ArrayDeque<>();
 
     public static final List<String> ANIMATION_END_BEHAVIORS = List.of("stop", "hold", "loop");
     public static final List<String> RULE_TRIGGERS = List.of("mined", "pickup", "mob", "container");
@@ -221,39 +227,99 @@ public class SpecialistDanceConfig {
     }
 
     public void resetRules() {
+        pushHistory();
         rules = defaultRules();
         dirty = true;
     }
 
+    private List<Rule> copyOfRules() {
+        List<Rule> copy = new ArrayList<>(rules.size());
+
+        for (Rule r : rules) {
+            copy.add(new Rule(r.trigger, r.source, r.item, r.enabled));
+        }
+        return copy;
+    }
+
+    private void pushHistory() {
+        undoStack.addLast(copyOfRules());
+
+        if(undoStack.size() > HISTORY_LIMIT) {
+            undoStack.removeFirst();
+        }
+        redoStack.clear();
+    }
+
+    public boolean canUndo() {
+        return !undoStack.isEmpty();
+    }
+
+    public boolean canRedo() {
+        return !redoStack.isEmpty();
+    }
+
+    public void undo() {
+        if(undoStack.isEmpty()) {
+            return;
+        }
+
+        redoStack.addLast(copyOfRules());
+        rules = undoStack.removeLast();
+        dirty = true;
+    }
+
+    public void redo() {
+        if (redoStack.isEmpty()) {
+            return;
+        }
+
+        undoStack.addLast(copyOfRules());
+        rules = redoStack.removeLast();
+        dirty = true;
+    }
+
     public void clearRules() {
+        pushHistory();
         rules = new ArrayList<>();
         dirty = true;
     }
 
-    public boolean addRule(@Nullable String rawTrigger, @Nullable String rawSource, @Nullable String rawItem) {
+    public @Nullable String addRule(@Nullable String rawTrigger, @Nullable String rawSource, @Nullable String rawItem) {
 
-        if (rawTrigger == null || !RULE_TRIGGERS.contains(rawTrigger)) return false;
+        if (rawTrigger == null || !RULE_TRIGGERS.contains(rawTrigger)) return "unknown trigger";
         String itemId = normalizeOreId(rawItem);
-        if (itemId == null) return false;
+        if (itemId == null) return "item id must look like minecraft:diamond";
 
-        String sourceId = "pickup".equals(rawTrigger) ? "" : normalizeOreId(rawSource);
-        if ("pickup".equals(rawTrigger) == false && sourceId == null) return false;
+        boolean pickup = "pickup".equals(rawTrigger);
+        String sourceId = pickup ? "" : normalizeOreId(rawSource);
+
+        if (!pickup && sourceId == null) {
+            return switch (rawTrigger) {
+                case "mob" -> "mob id must look like minecraft:zombie";
+                case "container" -> "container id must look like minecraft:chest";
+                default -> "block id must look like minecraft:diamond_ore";
+            };
+        }
 
         Rule candidate = new Rule(rawTrigger, sourceId, itemId, true);
-        if (containsRule(rules, candidate)) return false;
+        if (containsRule(rules, candidate)) return "that rule is already in the list";
 
+        pushHistory();
         rules.add(candidate);
         dirty = true;
-        return true;
+        return null;
     }
 
     public boolean toggleRule(Rule rule) {
+        pushHistory();
         rule.enabled = !rule.enabled;
         dirty = true;
         return true;
     }
 
     public boolean removeRule(Rule rule) {
+        pushHistory();
+
         if (!rules.remove(rule)) return false;
         dirty = true;
         return true;

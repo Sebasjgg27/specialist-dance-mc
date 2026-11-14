@@ -152,7 +152,7 @@ public class OreTriggersScreen extends Screen {
         addRenderableWidget(new RuleList(this.minecraft, listWidth, listHeight, listX, 40));
 
         addRenderableWidget(
-            CycleButton.<String>builder(Component::literal, trigger)
+            CycleButton.<String>builder(value -> Component.literal(labelOf(value)), trigger)
                 .withValues(SpecialistDanceConfig.RULE_TRIGGERS)
                 .create(
                     listX, triggerTop, listWidth, 18,
@@ -172,23 +172,43 @@ public class OreTriggersScreen extends Screen {
             EditBox sBox = new EditBox(this.font, listX, sourceTop, boxWidth, 18, Component.literal("Source"));
             sBox.setMaxLength(128);
             sBox.setHint(Component.literal(sourceHint()));
-            sBox.setValue(sourceText);
             sBox.setResponder(value -> {
                 sourceText = value;
                 sourceMatch = ghost(sBox, sourceRegistry(), value);
+                notice = null;
             });
+            sBox.setValue(sourceText);
             sourceBox = sBox;
             addRenderableWidget(sBox);
+
+            Function<String, ItemStack> iconOf = "mob".equals(trigger)
+                ? OreTriggersScreen::mobStackOf
+                : ItemGridScreen::stackOf;
+
+            addRenderableWidget(
+                Button.builder(
+                    Component.literal("mob".equals(trigger) ? "Pick mob" : "Pick block"),
+                    button -> minecraft.setScreen(new ItemGridScreen(
+                        this,
+                        Component.literal("Pick the source"),
+                        sourceText,
+                        sourceRegistry(),
+                        iconOf,
+                        id -> sourceText = id)))
+                    .bounds(listX + boxWidth + 4, sourceTop, 68, 18)
+                    .build()
+            );
         }
 
         EditBox iBox = new EditBox(this.font, listX, itemTop, boxWidth, 18, Component.literal("Item"));
         iBox.setMaxLength(128);
         iBox.setHint(Component.literal("Item you get"));
-        iBox.setValue(itemText);
         iBox.setResponder(value -> {
             itemText = value;
             itemMatch = ghost(iBox, itemIds, value);
+            notice = null;
         });
+        iBox.setValue(itemText);
         itemBox = iBox;
         addRenderableWidget(iBox);
 
@@ -202,13 +222,15 @@ public class OreTriggersScreen extends Screen {
 
         addRenderableWidget(
             Button.builder(Component.literal("Add rule"), button -> {
-                if (config.addRule(trigger, requiresSource() ? sourceText : "", itemText)) {
+                String reason = config.addRule(trigger, requiresSource() ? sourceText : "", itemText);
+
+                if (reason == null) {
                     sourceText = "";
                     itemText = "";
                     notice = null;
                     rebuildWidgets();
                 } else {
-                    notice = "id must look like minecraft:diamond_ore";
+                    notice = reason;
                 }
             })
                 .bounds(listX, actionTop, 76, 18)
@@ -238,6 +260,28 @@ public class OreTriggersScreen extends Screen {
                 .bounds(listX + 202, actionTop, 56, 18)
                 .build()
         );
+
+        Button undoButton = Button.builder(Component.literal("Undo"), button -> {
+            config.undo();
+            notice = null;
+            rebuildWidgets();
+        })
+            .bounds(listX + listWidth - 96, actionTop, 46, 18)
+            .build();
+
+        undoButton.active = config.canUndo();
+        addRenderableWidget(undoButton);
+
+        Button redoButton = Button.builder(Component.literal("Redo"), button -> {
+            config.redo();
+            notice = null;
+            rebuildWidgets();
+        })
+            .bounds(listX + listWidth - 48, actionTop, 46, 18)
+            .build();
+
+        redoButton.active = config.canRedo();
+        addRenderableWidget(redoButton);
 
         addRenderableWidget(
             Button.builder(Component.literal("Done"), button -> onClose())
@@ -301,15 +345,34 @@ public class OreTriggersScreen extends Screen {
             return null;
         }
 
+        String full = null;
+        String path = null;
+
         for (String id : ids) {
-            if (id.toLowerCase(Locale.ROOT).startsWith(needle)) {
-                box.setSuggestion(id.substring(typed.length()));
-                return id;
+            int separator = id.indexOf(':');
+
+            if (full == null && id.startsWith(needle)) {
+                full = id;
+            }
+
+            if (path == null && id.substring(separator + 1).startsWith(needle)) {
+                path = id;
+            }
+
+            if (full != null && path != null) {
+                break;
             }
         }
 
-        box.setSuggestion(null);
-        return null;
+        String match = full != null ? full : path;
+
+        if (match == null) {
+            box.setSuggestion(null);
+            return null;
+        }
+
+        box.setSuggestion(full != null ? match.substring(typed.length()) : " -> " + match);
+        return match;
     }
 
     private boolean acceptGhost(EditBox box, @Nullable String match) {
@@ -324,6 +387,20 @@ public class OreTriggersScreen extends Screen {
 
     @Override
     public boolean keyPressed(@NonNull KeyEvent event) {
+        if (event.hasControlDown() && event.key() == GLFW.GLFW_KEY_Z) {
+            config.undo();
+            notice = null;
+            rebuildWidgets();
+            return true;
+        }
+
+        if (event.hasControlDown() && event.key() == GLFW.GLFW_KEY_Y) {
+            config.redo();
+            notice = null;
+            rebuildWidgets();
+            return true;
+        }
+
         if (event.key() == GLFW.GLFW_KEY_TAB) {
             if (acceptGhost(sourceBox, sourceMatch) || acceptGhost(itemBox, itemMatch)) {
                 return true;
@@ -466,7 +543,8 @@ public class OreTriggersScreen extends Screen {
 
     private class RuleList extends ObjectSelectionList<RuleEntry> {
         RuleList(Minecraft minecraft, int width, int height, int x, int y) {
-            super(minecraft, width, height, x, y);
+            super(minecraft, width, height, y, ROW_HEIGHT);
+            setX(x);
             ruleList = this;
             for (Rule rule : List.copyOf(config.rules)) {
                 addEntry(new RuleEntry(rule), ROW_HEIGHT);
