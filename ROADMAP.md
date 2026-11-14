@@ -336,6 +336,15 @@ on branch `v1.6.0`, released with the working tree · **Tag:** `v1.6.0` 2026-11-
 `v1.6.0` — the precedent is Phase 6b, which shipped inside `v1.5.0`. `v1.7.0` is retired and no phase
 targets it; Phase 9 keeps `v1.8.0`.
 
+**Housekeeping 2026-11-14:** the temporary Loom metadata mirror is gone. `piston-meta.mojang.com`
+answers again, so `loomCustomMetadataUrl`, the `customMinecraftMetadata` block in `build.gradle` and
+`tools/loom-mirror.sh` are deleted and `AGENTS.md` lost its workaround section. Proven with the
+mirror stopped and `~/.gradle/caches/fabric-loom/1.21.11/mojang_minecraft_info.json` deleted first:
+Loom re-fetched the metadata from Mojang, `./gradlew build --rerun-tasks` reported `BUILD SUCCESSFUL`
+on 7 executed tasks, and the rebuilt jar matched the uploaded `specialist-dance-1.6.0.jar` byte for
+byte (`62dce6e6…d55d0f59`). `docs/plans/2026-10-30-*.md` still describe the mirror because they are
+dated plan records, not living docs.
+
 **Unverified edge:** `BuiltInRegistries.ITEM` is a *defaulted* registry
 (`DefaultedMappedRegistry.getValue` falls back to `defaultValue`, proven by bytecode), so a rule whose
 `item` names a nonexistent id resolves to `minecraft:air` instead of `null`. `itemById()`

@@ -15,23 +15,13 @@ Client-only Fabric mod for Minecraft 1.21.11. It plays a 147-frame dance overlay
 
 ```bash
 ./gradlew build        # compile + jar in build/libs/
-./gradlew runClient    # dev client (needs the metadata mirror below)
+./gradlew runClient    # dev client
 ./gradlew compileJava  # fast compile check
 ```
 
 - There are **no automated tests** (`test` is `NO-SOURCE`); validation is `./gradlew build` plus in-game QA.
 - Always use the bundled wrapper, target Java 21 (Gradle toolchain handles it; the machine default JDK may be newer).
-- `./gradlew build --offline` only works when the metadata mirror is **not** configured. The mirror is reached over localhost and Gradle offline mode blocks it.
-
-### Network workaround (temporary)
-
-`gradle.properties` sets `loomCustomMetadataUrl=http://127.0.0.1:8765/1.21.11.json` because the Mojang endpoints are unreachable from this machine. Start the mirror with:
-
-```bash
-./tools/loom-mirror.sh   # serves the cached version metadata on 127.0.0.1:8765
-```
-
-If builds fail with a connection error to port 8765, the mirror is not running. If a stale `~/.gradle/caches/fabric-loom/*.lock` contains `disowned`, delete it. Remove `loomCustomMetadataUrl`, `tools/loom-mirror.sh` and the `customMinecraftMetadata` block in `build.gradle` once Mojang is reachable again.
+- If a stale `~/.gradle/caches/fabric-loom/*.lock` contains `disowned`, delete it and let the next build rebuild the Loom cache.
 
 ## Layout
 
@@ -49,7 +39,7 @@ If builds fail with a connection error to port 8765, the mirror is not running. 
 - `src/main/java/com/sebas/specialistdance/integration/ModMenuIntegration.java` — ModMenu entrypoint that opens the config screen.
 - `src/main/java/com/sebas/specialistdance/mixin/ClientPacketListenerMixin.java` — player pickup detection.
 - `src/main/resources/` — `fabric.mod.json`, mixin config, lang files, animation frames, bundled `sounds/default.ogg`.
-- `tools/` — dev-only, never shipped: `loom-mirror.sh` (metadata mirror) and `GifToFrames.java` (`java tools/GifToFrames.java <in.gif> <out-dir> [maxSize]` exports a GIF into a `frame_%03d.png` dance pack).
+- `tools/` — dev-only, never shipped: `GifToFrames.java` (`java tools/GifToFrames.java <in.gif> <out-dir> [maxSize]` exports a GIF into a `frame_%03d.png` dance pack).
 - `ROADMAP.md` / `CHANGELOG.md` / `README.md` — phase plan, release history, user docs.
 
 ## Conventions
