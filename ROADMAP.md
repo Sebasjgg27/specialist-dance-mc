@@ -4,7 +4,7 @@
 > If this file and the code disagree, the code wins and this file is wrong.
 
 **Latest stable:** `v1.6.0` (2026-11-14, tagged `8e40558`) — Your rules, animation speed and Mod Menu
-**In verification:** `v1.6.1` (2026-11-14, GitHub pre-release) — two build variants: `full` carries the bundled dance and track, `lite` ships the mod only, and both handle a machine with no content installed. The number carries no `-rc` suffix; the `v1.6.1-rc1` tag and release were folded into it
+**In verification:** `v1.6.1` (2026-11-14, tagged `04f0940`, GitHub pre-release) — two build variants: `full` carries the bundled dance and track, `lite` ships the mod only, and both handle a machine with no content installed. The number carries no `-rc` suffix; the `v1.6.1-rc1` tag and release were folded into it
 **Branch:** `main` · **History:** 42 commits, 2026-10-10 → 2026-11-14 (35 days)
 
 ## What this project is
