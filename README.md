@@ -57,15 +57,15 @@ then holds an empty list, which nothing re-seeds.
 
 1. Install [Fabric Loader](https://fabricmc.net/use/installer/) for 1.21.11
    and **Fabric API**.
-2. Drop `specialist-dance-1.21.11-fabric-1.6.1-rc1.jar` into your `mods/` folder.
+2. Drop `specialist-dance-1.21.11-fabric-1.6.2.jar` into your `mods/` folder.
 3. Launch the game — you should see `Specialist Dance is Ready!` in the log.
 
 Two artifacts ship, and only the first one carries content:
 
 | Jar | Contains | Needs |
 |---|---|---|
-| `specialist-dance-1.21.11-fabric-1.6.1-rc1.jar` | the bundled `specialist` dance (147 frames) and the `default` track | nothing |
-| `specialist-dance-1.21.11-fabric_lite-1.6.1-rc1.jar` | the mod only | your own dance pack and track in the config folders |
+| `specialist-dance-1.21.11-fabric-1.6.2.jar` | the bundled `specialist` dance (147 frames) and the `default` track | nothing |
+| `specialist-dance-1.21.11-fabric_lite-1.6.2.jar` | the mod only | your own dance pack and track in the config folders |
 
 The mod is otherwise identical. With the lite jar and nothing installed yet, the **K** menu says
 which folder to drop files into instead of offering a dance that cannot play.

@@ -3,8 +3,10 @@
 > Living document. Update it whenever a phase changes state.
 > If this file and the code disagree, the code wins and this file is wrong.
 
-**Latest stable:** `v1.6.0` (2026-11-14, tagged `8e40558`) · **In verification:** `v1.6.1-rc1` (2026-11-14, pre-release) — two build variants; the lite jar has only run as a dev client and the no-content panes have never been seen in-game
-**Branch:** `main` · **History:** 38 commits, 2026-10-10 → 2026-11-14 (35 days)
+**Latest stable:** `v1.6.2` (2026-11-14) — two build variants: `full` carries the bundled dance and track, `lite` ships the mod only, and both handle a machine with no content installed
+**Previous:** `v1.6.0` (2026-11-14, tagged `8e40558`) · `v1.6.1` never became stable — the same content went out first as the `v1.6.1-rc1` pre-release
+**In verification:** nothing
+**Branch:** `main` · **History:** 39 commits, 2026-10-10 → 2026-11-14 (35 days)
 
 ## What this project is
 
@@ -39,13 +41,13 @@ tracks.
 | 6b | Dance Packages | 1.5.0 | 10-30 → 11-01 | 2 d | 1 | ✅ | shipped inside v1.5.0 |
 | 7 | Solid Ground + Speed | 1.6.0 | 11-01 → 11-02 | 2 d | 3 | ✅ | released with Phase 8 as one `v1.6.0` |
 | 8 | Your Rules | 1.6.0 | 11-02 → 11-14 | 13 d | 5 | ✅ | released; `v1.7.0` retired, 3/4 triggers observed |
-| — | Build Variants | 1.6.1-rc1 | 11-14 | 1 d | 2 | 🛠 | pre-release; out-of-plan patch, not a phase |
+| — | Build Variants | 1.6.2 | 11-14 | 1 d | 3 | ✅ | released; out-of-plan patch, not a phase |
 | 9 | Provable | 1.8.0 | — | — | — | ⬜ | 0% |
 | 10 | Stability | 1.9.0 | — | — | — | ⬜ | 0% |
 | 11 | Final Mix | 2.0.0 | — | — | — | ⬜ | 0% |
 | 12 | The Control Room | 2.1.0 | — | — | — | ⬜ | 0% |
 
-**Overall: 14 phases + 1 out-of-plan patch · 10 released across 8 tags, 1 more sitting as a pre-release · 0 built · 4 not started.**
+**Overall: 14 phases + 1 out-of-plan patch · 10 phases released across 8 stable tags · the patch released as `v1.6.2` · 0 built · 4 not started.**
 
 ## Current reality (2026-11-14)
 
@@ -54,7 +56,7 @@ tracks.
 | Ore → drop → dance trigger path | 🧪 diamond / deepslate diamond only (`run/logs/latest.log` 20:55:32) |
 | Configurable trigger rules | 🧪 `config.rules` (`{trigger, source, item, enabled}`) read by `SpecialistDanceConfig.matches()`; `activated for mob death at BlockPos{x=12, y=119, z=2}` (19:33:10) and `activated for container minecraft:chest` (19:34:03) (`run/logs/2026-11-12-3.log.gz`) |
 | `mined` and `pickup` triggers | 🧪 `mined` fired end to end 2026-11-14: `registered mined minecraft:diamond_ore -> minecraft:diamond at BlockPos{x=9, y=119, z=4}` → `linked drop minecraft:diamond (entity 334)` → `activated for mined ore at` → `trigger dance=Zelda frames=29 … track=Zelda` (`run/logs/2026-11-14-lite-dev-client.log` 16:23:02). 🛠 `pickup` has never written an activation line |
-| `full` / `lite` build variants | 🛠 `-PmodVariant=lite` excludes the bundled frames and track: jar 538 604 B against 2 038 437 B, `frames/frame_*` entries 0 against 147, `sounds/default.ogg` gone, both variants remapped to intermediary and both expanding `"version"`. Only the dev client has run lite |
+| `full` / `lite` build variants | 🧪 offline, on the shipped `1.6.2` jars: `-PmodVariant=lite` gives 538 602 B against 2 038 435 B, `frames/frame_*` entries 0 against 147, `sounds/default.ogg` gone, both remapped to intermediary, both expanding `"version"` to `1.6.2`. 🛠 only the dev client has run lite; a production `mods/` install is unobserved |
 | The K menu with nothing installed | 🛠 empty-list guards, greyed **Play preview** / **Preview dance on close** / **Position dance** and the "drop files here" hints are compiled; never observed in a running client |
 | Per-rule editor | 🧪 `config/menu/OreTriggersScreen` (**Rules** pane → **Your rules**) opened in-game: rows render with icons, and the two rules that fired were authored there. 🛠 **Undo**, **Redo**, **Clear** and **Reset** have never been clicked |
 | Two-pane **K** menu | 🛠 sidebar + scrollable file lists + live dance preview (`SpecialistDanceConfigScreen`); no screenshot or log observation of a pane switch |
@@ -361,22 +363,25 @@ absorbs the same quirk silently: `ItemStack.isEmpty()` is `this == EMPTY || item
 (verified in the mapped jar), so a bad id prints its text with **no icon** rather than a stone
 placeholder. Not observed either way.
 
-## Patch — v1.6.1-rc1: Build Variants 🛠
+## Patch — v1.6.2: Build Variants ✅
 
-**Time:** 2026-11-14 (1 day) · **Commits:** 2 · **Tag:** `v1.6.1-rc1` 2026-11-14, pre-release.
+**Time:** 2026-11-14 (1 day) · **Commits:** 3 · **Tag:** `v1.6.2` 2026-11-14.
 **Progress:** built and offline-verified; out of the phase plan by rule 6 — CurseForge and Modrinth
 want a jar that does not carry the bundled animation, and GitHub wants the one that does.
 
+- Released as `v1.6.2` after the identical content had already gone out as the `v1.6.1-rc1`
+  pre-release. `v1.6.1` never became stable; the rc release and tag stay published as history.
 - `build.gradle` reads `modVariant` (`full` is the default, `lite` strips content) and folds it into
   `base.archivesName` beside `minecraft_version` and the loader, so a file name states what it is:
-  `specialist-dance-1.21.11-fabric-1.6.1-rc1.jar` and
-  `specialist-dance-1.21.11-fabric_lite-1.6.1-rc1.jar`.
+  `specialist-dance-1.21.11-fabric-1.6.2.jar` and
+  `specialist-dance-1.21.11-fabric_lite-1.6.2.jar`.
 - `processResources` excludes `assets/specialist-dance/textures/gui/frames/**` and
   `assets/specialist-dance/sounds**` on `lite`, and takes the variant as an `inputs.property` so a
   cached task cannot answer for the other content set.
-- 🧪 Offline proof, both jars: `frames/frame_*` 147 → 0, `sounds/default.ogg` (282 287 B) → absent,
-  total 2 038 437 → 538 604 B, `fabric.mod.json` still expands `"version"`, and
-  `javap -p -c ClientPacketListenerMixin` still reports 7 intermediary `class_` references in each, so
+- 🧪 Offline proof, both jars, re-run on the `1.6.2` artifacts 2026-11-14 16:42–16:43:
+  `frames/frame_*` 147 → 0, `sounds/default.ogg` (282 287 B) → absent, total 2 038 435 → 538 602 B,
+  `fabric.mod.json` still expands `"version"` to `1.6.2` in each, and
+  `javap -p -c ClientPacketListenerMixin` still reports 7 intermediary `class_` references, so
   neither is a dev jar in disguise. No other entry differs between the two listings.
 - `DanceRegistry` and `MusicManager` now probe for their bundled content at runtime — `getResource`
   on `frame_000.png` and `default.ogg` — instead of assuming it, and `find()` ends at a zero-frame
@@ -451,7 +456,7 @@ Anything 🛠 at release time sits here until it is 🧪.
       to save; with the underscore allowed, a rule authored in the editor survived a save and a
       reload and fired — `activated for mob death at BlockPos{x=12, y=119, z=2}` (19:33:10) and
       `activated for container minecraft:chest` (19:34:03) (`run/logs/2026-11-12-3.log.gz`).
-- [x] 🧪 Closed by `v1.6.1-rc1`: `mined` registered but never activated. On 2026-11-12 the log ended
+- [x] 🧪 Closed by `v1.6.2`: `mined` registered but never activated. On 2026-11-12 the log ended
       at `registered mined minecraft:diamond_ore -> minecraft:diamond at BlockPos{...}` with nothing
       after it (`run/logs/2026-11-12-1.log.gz`); on 2026-11-14 the chain ran end to end in Survival —
       `registered` → `linked` → `activated for mined ore at` → `trigger dance=Zelda frames=29`
@@ -514,14 +519,14 @@ Anything 🛠 at release time sits here until it is 🧪.
       `MIN/MAX_ANIMATION_SPEED` in `SpecialistDanceConfig` as literals rather than one
       shared constant, to keep the `dance` package from depending on `config`. Changing
       one without the other lets a pack speed escape the range the slider can reach.
-- [ ] `v1.6.1-rc1`: the lite jar has never been loaded by a production client. Only
+- [ ] `v1.6.2`: the lite jar has never been loaded by a production client. Only
       `./gradlew runClient -PmodVariant=lite` has run without bundled content, and that reads the
       same excluded set off `build/resources/main` (verified: 4 resource files, `frame_*.png` 0).
       Whether a real `mods/` install behaves identically is assumed.
-- [ ] `v1.6.1-rc1`: the no-content state has never been observed — the **Music** / **Dance** hints,
+- [ ] `v1.6.2`: the no-content state has never been observed — the **Music** / **Dance** hints,
       the three greyed buttons, `gif used: none · track: none` and the
       `no dance pack available, trigger skipped` branch of `triggerDance()` are all 🛠.
-- [ ] `v1.6.1-rc1`: `DanceRegistry.scan()` and `importGif()` still refuse the name `specialist` in
+- [ ] `v1.6.2`: `DanceRegistry.scan()` and `importGif()` still refuse the name `specialist` in
       the lite build, where there is no bundled dance to reserve it for — a user pack called
       `specialist` is dropped with `is reserved for the bundled dance` and never listed.
 - [ ] `modVariant` is unchecked: `-PmodVariant=ligt` builds a full-content jar named `_ligt`.
