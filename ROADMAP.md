@@ -3,14 +3,15 @@
 > Living document. Update it whenever a phase changes state.
 > If this file and the code disagree, the code wins and this file is wrong.
 
-**Latest release:** `v1.5.0` (2026-11-01, tagged `79c3907`) · **In development:** `v1.6.0` Phase 7, on branch `v1.6.0`
-**Branch:** `v1.6.0` · **History:** 26 commits, 2026-10-10 → 2026-11-02 (23 days)
+**Latest release:** `v1.5.0` (2026-11-01, tagged `79c3907`) · **Releasing now:** `v1.6.0` Phases 7 + 8, on branch `v1.6.0`
+**Branch:** `v1.6.0` · **History:** 31 commits, 2026-10-10 → 2026-11-14 (35 days)
 
 ## What this project is
 
 A client-side Fabric mod (Minecraft 1.21.11, Java 21) that plays an on-screen dance
-when you mine a valuable ore and pick up its drop, with optional music, an in-game
-config menu and user-supplied dance packs and tracks.
+when an item matching one of your rules reaches your inventory — a mined ore drop by
+default — with optional music, an in-game config menu and user-supplied dance packs and
+tracks.
 
 ## Status legend
 
@@ -36,22 +37,23 @@ config menu and user-supplied dance packs and tracks.
 | 5 | Dance Packs + Layout | 1.4.0 | 10-25 → 10-28 | 3 d | 9 | ✅ | 10/10 |
 | 6 | Animation Control | 1.5.0 | 10-30 → 11-01 | 2 d | 4 | ✅ | released |
 | 6b | Dance Packages | 1.5.0 | 10-30 → 11-01 | 2 d | 1 | ✅ | shipped inside v1.5.0 |
-| 7 | Solid Ground + Speed | 1.6.0 | 11-01 → 11-02 | 2 d | 3 | 🛠 | 4/4 built + two-pane menu, 0 observed |
-| 8 | Your Rules | 1.7.0 | 11-02 | 1 d | 0 | 🛠 | 3/3 built + authoring UI, uncommitted on `v1.6.0` |
+| 7 | Solid Ground + Speed | 1.6.0 | 11-01 → 11-02 | 2 d | 3 | ✅ | released with Phase 8 as one `v1.6.0` |
+| 8 | Your Rules | 1.6.0 | 11-02 → 11-14 | 13 d | 5 | ✅ | released; `v1.7.0` retired, 2/4 triggers observed |
 | 9 | Provable | 1.8.0 | — | — | — | ⬜ | 0% |
 | 10 | Stability | 1.9.0 | — | — | — | ⬜ | 0% |
 | 11 | Final Mix | 2.0.0 | — | — | — | ⬜ | 0% |
 | 12 | The Control Room | 2.1.0 | — | — | — | ⬜ | 0% |
 
-**Overall: 14 phases · 8 released across 7 tags · 2 built · 4 not started.**
+**Overall: 14 phases · 10 released across 8 tags · 0 built · 4 not started.**
 
-## Current reality (2026-11-02)
+## Current reality (2026-11-14)
 
 | Claim | State |
 |---|---|
 | Ore → drop → dance trigger path | 🧪 diamond / deepslate diamond only (`run/logs/latest.log` 20:55:32) |
-| Configurable ore → drop map | 🛠 Phase 8 work, uncommitted on `v1.6.0`: `config.oreDrops` + `disabledOres` are read by `expectedDrop()` (`SpecialistDanceClient.java:458`); no log yet shows a custom id firing or a disabled ore staying silent |
-| Per-rule editor | 🛠 `config/menu/OreTriggersScreen` (**Rules** pane → **Your rules**): toggle, add, right-click delete, reset, item icons and a creative-style `ItemGridScreen` picker. Compiles into `build/libs/specialist-dance-1.5.0.jar`; never opened in-game |
+| Configurable trigger rules | 🧪 `config.rules` (`{trigger, source, item, enabled}`) read by `SpecialistDanceConfig.matches()`; `activated for mob death at BlockPos{x=12, y=119, z=2}` (19:33:10) and `activated for container minecraft:chest` (19:34:03) (`run/logs/2026-11-12-3.log.gz`) |
+| `mined` and `pickup` triggers | 🛠 `registered mined minecraft:diamond_ore -> minecraft:diamond at BlockPos{...}` appears twice (`run/logs/2026-11-12-1.log.gz`) with no `activated for mined ore` line after it, and no `pickup-only trigger` line has ever been written |
+| Per-rule editor | 🧪 `config/menu/OreTriggersScreen` (**Rules** pane → **Your rules**) opened in-game: rows render with icons, and the two rules that fired were authored there. 🛠 **Undo**, **Redo**, **Clear** and **Reset** have never been clicked |
 | Two-pane **K** menu | 🛠 sidebar + scrollable file lists + live dance preview (`SpecialistDanceConfigScreen`); no screenshot or log observation of a pane switch |
 | Bundled `specialist` dance renders | ✅ shipped since v1.0.0 |
 | Music plays with the dance, all formats | ✅ released v1.3.0 / v1.3.1 |
@@ -219,10 +221,10 @@ config menu and user-supplied dance packs and tracks.
 - ⬜ Zip/`.dancepack` import (plan Task 8) is not implemented.
 - ⬜ Per-pack layout still does not exist; the stage remains global.
 
-## Phase 7 — v1.6.0: Solid Ground + Speed 🛠
+## Phase 7 — v1.6.0: Solid Ground + Speed ✅
 
-**Time:** 2026-11-01 → 2026-11-02 · **Commits:** 3 (`feec132` `42ac322` `4fa8aef`) on branch `v1.6.0`, plus an
-uncommitted working tree · **Tag:** none yet.
+**Time:** 2026-11-01 → 2026-11-02 · **Commits:** 3 (`feec132` `42ac322` `4fa8aef`) on branch `v1.6.0`,
+released with the Phase 8 working tree · **Tag:** `v1.6.0` 2026-11-14, shared with Phase 8.
 **Progress:** 4/4 planned items built, plus a two-pane menu rework and the ore system pulled
 forward from Phase 8 · 0 observed. The ModMenu placeholder screen dropped from the plan — a real
 editing screen already ships on **K**; ModMenu just opens it.
@@ -274,51 +276,74 @@ editing screen already ships on **K**; ModMenu just opens it.
   sits behind the panel. **Position dance** also moves **Done** into the bottom bar with
   Center / Fit / reset so nothing floats over the stage.
 
-## Phase 8 — v1.7.0: Your Rules 🛠
+## Phase 8 — v1.6.0: Your Rules ✅
 
-**Time:** 2026-11-02 → · **Commits:** none — the work sits uncommitted on the `v1.6.0` branch.
-**Progress:** 3/3 planned items built, plus an authoring UI · 0 observed.
+**Time:** 2026-11-02 → 2026-11-14 · **Commits:** 5 (`f74290f` `dbf08a0` `0628b1f` `19b84f2` `b24f5d9`)
+on branch `v1.6.0`, released with the working tree · **Tag:** `v1.6.0` 2026-11-14, shared with Phase 7.
+**Progress:** 3/3 planned items built, plus a four-trigger model and an authoring UI · 2/4 triggers fired.
 
-- 🛠 The hardcoded ore → drop map left `expectedDrop()`. `config.oreDrops` (`Map<String, String>`
-  of block id → item id) is now the source, seeded by `defaultOreDrops()` with the same ten entries
-  the old `if`-chain covered (`diamond_ore`, `deepslate_diamond_ore`, `emerald_ore`,
-  `deepslate_emerald_ore`, `gold_ore` → `raw_gold`, `deepslate_gold_ore`, `nether_gold_ore` →
-  `gold_nugget`, `iron_ore` → `raw_iron`, `deepslate_iron_ore`, `ancient_debris`). The parallel
-  `TRACKED_ITEMS` list is gone: the pickup loop no longer filters against a fixed item set, it asks
-  the ore what drop to expect.
-- 🛠 Per-ore toggles: `config.disabledOres` is checked in `expectedDrop()` before the drop lookup
-  (`SpecialistDanceClient.java:467`), so a disabled ore never registers a source and the animation
-  and audio paths are untouched — the trigger stays independent of both. `resetOres()` restores both
-  maps. Edited in `config/menu/OreTriggersScreen`, opened from the **Rules** pane as **Your rules**
-  (`SpecialistDanceConfigScreen.java:41` renames the `Ores` category and `:236` the button label);
-  the screen saves on close.
-- 🛠 The toggle list became a rule editor: rows are `[x]/[ ]` + the mined block's **item icon** + its
-  id, right-aligned drop icon + id with a hover tooltip, and the whole drop side is skipped on a row
-  too narrow to fit both texts rather than overprinting them. `addRule(block, drop)` (`SpecialistDanceConfig.java:200`) and `removeRule(block)`
-  (`:215`) are the write paths — left-click toggles, right-click deletes and rebuilds, **Add rule**
-  and **Reset** sit in a footer anchored to `Done` so the pane never floats off-screen. Two `EditBox`
-  es take ids by hand; `ItemGridScreen` is the alternative: a paged creative-style grid over
-  `BuiltInRegistries.ITEM.keySet()` with a filter box (`minecraft:diamond_ore` or `diamond`), scroll
-  to page, click returns the id through a callback.
-- 🛠 Config hardening for the new fields: `CURRENT_VERSION` 1 → 2, `normalizeOreId()` trims,
-  lowercases, defaults a bare path to the `minecraft` namespace and rejects anything outside
-  `[a-z0-9_.-]` / `[a-z0-9/.-]`; `sanitize()` drops invalid keys, dedupes collisions and sets a
-  transient `dirty` flag, and `load()` now rewrites the file when `dirty` is set or the version
-  stamp moved — previously it saved only for the `seenDances` seed.
+- 🧪 The hardcoded ore → drop map left `SpecialistDanceClient` entirely. `config.rules` is a
+  `List<Rule>` of `{trigger, source, item, enabled}` read by `SpecialistDanceConfig.matches()` and
+  `minedDropFor()`, seeded by `defaultRules()` with the same ten entries the old `if`-chain covered
+  (`diamond_ore`, `deepslate_diamond_ore`, `emerald_ore`, `deepslate_emerald_ore`, `gold_ore` →
+  `raw_gold`, `deepslate_gold_ore`, `nether_gold_ore` → `gold_nugget`, `iron_ore` → `raw_iron`,
+  `deepslate_iron_ore`, `ancient_debris`). The parallel `TRACKED_ITEMS` list is gone: the pickup
+  loop asks the rules what to expect instead of filtering against a fixed item set.
+- 🛠 Four triggers, one detection path each in `SpecialistDanceClient`: `mined` records the expected
+  drop at the broken block and links it to the item entity, `pickup` matches any item entity with no
+  source (`:490`), `mob` records a death and matches a drop near the corpse (`:533`), `container`
+  snapshots the inventory when a `RandomizableContainerBlockEntity` opens and fires on a positive
+  count delta (`:661`). `Rule.matches()` is the only gate, so a disabled row never registers a
+  source and the animation and audio paths stay untouched.
+- 🧪 2026-11-12: `mob` and `container` fired for the first time — `activated for mob death at
+  BlockPos{x=12, y=119, z=2}` (19:33:10) and `activated for container minecraft:chest` (19:34:03)
+  (`run/logs/2026-11-12-3.log.gz`). Both rules were typed into the editor, so the write path, the
+  save and the reload are proven by that one session.
+- 🛠 `mined` registers but has never activated: `registered mined minecraft:diamond_ore ->
+  minecraft:diamond at BlockPos{...}` twice with no `activated for mined ore` line after them
+  (`run/logs/2026-11-12-1.log.gz`). `pickup` has never written a line.
+- 🧪 `normalizeOreId()` trims, lowercases, defaults a bare path to `minecraft` and rejects anything
+  outside `[a-z0-9_.-]` / `[a-z0-9/_.-]`. The `_` in the path class is the 2026-11-12 fix: without it
+  every vanilla id was rejected, so `sanitize()` deleted all ten presets on load and no rule could be
+  saved. The `registered mined minecraft:diamond_ore` line above is the proof a preset survived load.
+- 🛠 The toggle list became a rule editor (`config/menu/OreTriggersScreen`, opened from the **Rules**
+  pane as **Your rules**, which saves on close): rows are `[x]/[ ]` + the source's **item icon** + its
+  id, right-aligned item icon + id with a hover tooltip, and the whole right side is skipped on a row
+  too narrow to fit both texts rather than overprinting them. **Trigger** cycles `mine`/`pickup`/`kill`/`open`,
+  **Source** hides itself on `pickup`, and **Add rule**, **Reset**, **Clear**, **Undo**, **Redo** and
+  **Done** sit in a footer built from `doneTop = height - 32` with every x derived from `listWidth`, so
+  nothing floats off-screen at a narrow window.
+- 🛠 `ItemGridScreen` is one paged creative-style grid over a supplied id list plus an `iconOf`
+  function, so the same screen serves `BuiltInRegistries.ITEM`, `BLOCK` and `ENTITY_TYPE`; the filter
+  box matches the full id or the path after `:` (`diamond` finds `minecraft:diamond_ore`), scroll
+  pages, click returns the id through a callback and TAB accepts the suggestion in a hand-typed box.
+- 🛠 The write paths are `addRule(trigger, source, item)` (`SpecialistDanceConfig.java:287`), which
+  returns the reason it refused and `null` on success, plus `toggleRule`, `removeRule`, `clearRules`
+  and `resetRules`. Each pushes a deep copy of `rules` onto a history capped at 40 (`HISTORY_LIMIT`)
+  that `undo()`/`redo()` walk; both stacks are `transient`, so they never reach the JSON.
+- 🧪 `CURRENT_VERSION` is 4 and reached disk (`run/config/specialist-dance.json`, 2026-11-12 21:53).
+  `sanitize()` drops rules with an unknown trigger or an unusable id, dedupes collisions and sets a
+  transient `dirty` flag, and `load()` rewrites the file when `dirty` is set or the version stamp
+  moved — previously it saved only for the `seenDances` seed.
+- 🛠 `load()` folds a v3 `blockRules`/`pickupRules` split into `rules` (`:91-119`) before
+  `sanitize()` runs. There is no v2 path: an interim file that only has `oreDrops`/`disabledOres`
+  falls through to `rules == null`, which `sanitize()` fills with `defaultRules()`, so that hand
+  authored map is lost. Neither branch has run against a real old file.
 - ⬜ (Stretch) celebration counter per ore type — not started.
 
-**Open decision (rule 6):** this landed on the `v1.6.0` branch, and rule 1 is one phase per release.
-Either `v1.6.0` ships without these files (they stay uncommitted and are retargeted at `v1.7.0`) or
-Phase 7 and Phase 8 release together and `v1.7.0` is dropped.
+**Resolved 2026-11-14 (rule 6):** rule 1 is one phase per release, but this phase landed on the
+`v1.6.0` branch and shares its config-versioning work with Phase 7. Phases 7 and 8 ship together as
+`v1.6.0` — the precedent is Phase 6b, which shipped inside `v1.5.0`. `v1.7.0` is retired and no phase
+targets it; Phase 9 keeps `v1.8.0`.
 
 **Unverified edge:** `BuiltInRegistries.ITEM` is a *defaulted* registry
-(`DefaultedMappedRegistry.getValue` falls back to `defaultValue`, proven by bytecode), so an
-`oreDrops` value naming a nonexistent item resolves to `minecraft:air` instead of `null`. The
-`points at unknown item` log in `expectedDrop()` is probably unreachable; the harmless outcome is no
-trigger, because no item entity carries air. The editor absorbs the same quirk silently:
-`ItemStack.isEmpty()` is `this == EMPTY || item == Items.AIR || count <= 0` (verified in the mapped
-jar), so a bad id prints its text with **no icon** rather than a stone placeholder. Not observed
-either way.
+(`DefaultedMappedRegistry.getValue` falls back to `defaultValue`, proven by bytecode), so a rule whose
+`item` names a nonexistent id resolves to `minecraft:air` instead of `null`. `itemById()`
+(`SpecialistDanceClient.java:694-704`) turns that into `null`, so the outcome is no trigger — the
+branch has never been exercised, because no rule with a bad id has been saved and mined. The editor
+absorbs the same quirk silently: `ItemStack.isEmpty()` is `this == EMPTY || item == Items.AIR || count <= 0`
+(verified in the mapped jar), so a bad id prints its text with **no icon** rather than a stone
+placeholder. Not observed either way.
 
 ## Phase 9 — v1.8.0: Provable ⬜
 
@@ -402,19 +427,23 @@ Anything 🛠 at release time sits here until it is 🧪.
       `animationSpeed`, a pack's `speedMultiplier` taking effect, a config value being
       clamped on load, or the `configVersion` upgrade of a pre-versioning file.
 - [ ] The two-pane **K** menu has no observation: switching panes, clicking a row in the track or
-      pack list, the live dance preview and the **Your rules** screen have never been seen in a
-      running client. The sidebar hit-test uses integer division on `event.y() - sidebarTop`, so a
-      click above the sidebar needs a check at short window heights.
-- [ ] Phase 8's rule system is entirely 🛠: no log shows a custom `oreDrops` entry firing, a
-      `disabledOres` entry suppressing a trigger, `normalizeOreId()` rejecting a hand-authored bad
-      id, or `resetOres()` reaching disk. Neither has the editor: no observation of a row icon, a
-      **Drop** grid click filling a box, **Add rule** appending a row, a right-click delete or the
-      `dirty`-flag rewrite in `load()`. Only diamond / deepslate diamond have ever triggered, and
-      the nine other default entries — iron, gold, nether gold, ancient debris and the deepslate
-      variants — are newly *reachable* now that `TRACKED_ITEMS` no longer gates the pickup loop.
-      The footer only clears **Done** at logical height ≥ 158 (checked offline in
-      `/tmp/rules-layout/RulesLayoutCheck.java`, 0 grid failures, overlap failures confined to
-      heights 100–157), so a tiny window is the one layout case left unproven in-game.
+      pack list and the live dance preview have never been recorded in a running client. The sidebar
+      hit-test uses integer division on `event.y() - sidebarTop`, so a click above the sidebar needs
+      a check at short window heights. The **Your rules** screen itself was opened on 2026-11-12 and
+      authored the two rules that fired.
+- [ ] Phase 8's rule system is 2/4 triggers. `mob` and `container` fired on 2026-11-12 and their
+      rules survived an editor session, a save and a reload, but no log shows a `mined` activation
+      (`registered mined` appears with nothing after it) or a `pickup`-only match, so nine of the ten
+      presets and the `pickup` trigger stay unproven — the last session left `"rules": []` on disk
+      (`run/config/specialist-dance.json`, 2026-11-12 21:53), which is what **Clear** writes and what
+      `sanitize()` leaves alone because it only substitutes `defaultRules()` when `rules` is `null`.
+      Never clicked: **Undo**, **Redo**, **Clear**, **Reset**, TAB autocomplete and the three pickers.
+      The footer layout that shipped with redesign B has no offline check at all; the one that existed
+      measured the previous anchored footer (logical height ≥ 158) and no longer applies.
+- [ ] A config written by an interim v2 build (`oreDrops`/`disabledOres`, no `rules`) has no
+      migration branch, so `sanitize()` replaces its map with `defaultRules()`. Only the dev
+      client ever produced such a file; a `v1.5.0` file has no rule keys at all and gets the
+      presets, which is the intended outcome.
 - [ ] Mod Menu has never been clicked. `modRuntimeOnly` puts it on the dev classpath, so
       the entrypoint and the `"enabled": false` null guard are both unexercised — the NPE
       the guard prevents has never been reproduced either.

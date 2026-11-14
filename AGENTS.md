@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Client-only Fabric mod for Minecraft 1.21.11. It plays a 147-frame dance overlay when the player picks up a drop from an ore they just mined, with optional music and an in-game config screen.tu madre tu padre, tu abuela, to tataraner
+Client-only Fabric mod for Minecraft 1.21.11. It plays a 147-frame dance overlay when an item the player configured reaches their inventory — a mined ore drop by default — with optional music and an in-game config screen.
 
 ## Working style: review and debug first
 
@@ -44,8 +44,8 @@ If builds fail with a connection error to port 8765, the mirror is not running. 
 - `src/main/java/com/sebas/specialistdance/dance/DanceTextures.java` — loads pack frames as `DynamicTexture`s and caches per-frame dimensions.
 - `src/main/java/com/sebas/specialistdance/config/menu/SpecialistDanceConfigScreen.java` — config screen (keybind `K`).
 - `src/main/java/com/sebas/specialistdance/config/menu/DanceLayoutScreen.java` — **Position dance** editor: drag to move, scroll to zoom.
-- `src/main/java/com/sebas/specialistdance/config/menu/OreTriggersScreen.java` — **Your rules** editor: toggle, add, delete and reset the `oreDrops` block → item map, with item icons per row.
-- `src/main/java/com/sebas/specialistdance/config/menu/ItemGridScreen.java` — creative-style item picker over `BuiltInRegistries.ITEM`: filter box, paged icon grid, returns the chosen id through a callback.
+- `src/main/java/com/sebas/specialistdance/config/menu/OreTriggersScreen.java` — **Your rules** editor: the `rules` list with per-row toggle/delete, a **Trigger** cycle (`mined`/`pickup`/`mob`/`container`), **Source** and **Item** fields with TAB suggestions, and **Add rule** / **Reset** / **Clear** / **Undo** / **Redo**.
+- `src/main/java/com/sebas/specialistdance/config/menu/ItemGridScreen.java` — creative-style picker over a supplied id list with an `iconOf` function, so one grid serves `BuiltInRegistries.ITEM`, `BLOCK` and `ENTITY_TYPE`: filter box, paged icon grid, returns the chosen id through a callback.
 - `src/main/java/com/sebas/specialistdance/integration/ModMenuIntegration.java` — ModMenu entrypoint that opens the config screen.
 - `src/main/java/com/sebas/specialistdance/mixin/ClientPacketListenerMixin.java` — player pickup detection.
 - `src/main/resources/` — `fabric.mod.json`, mixin config, lang files, animation frames, bundled `sounds/default.ogg`.
@@ -102,6 +102,11 @@ If builds fail with a connection error to port 8765, the mirror is not running. 
 - `migrate()` runs **after** `sanitize()`, so the version stamp that eventually reaches `save()` holds clamped values, not the raw ones from disk.
 - A `pack.json` number that means "no override" uses the `-1` sentinel (`frameDurationMs`, `speedMultiplier`), not `null` and not `0` — `"frameDurationMs": 0` and `"speedMultiplier": 0` must both fall back to the global, and `0` would otherwise clamp to the slowest legal speed.
 - A pack's `speedMultiplier` **overrides** the global **Animation speed** slider rather than multiplying with it, matching the `frameDurationMs` precedent. A user whose slider "does nothing" is playing a pack that declares its own speed.
+- `ORE_PATH` must include `_`: nearly every vanilla id contains an underscore, and a path class that rejects it makes `normalizeOreId()` return `null`, so `sanitize()` **deletes the rule** at load. That removed all ten presets on every launch until 2026-11-12.
+- `sanitize()` substitutes `defaultRules()` only when `rules` is `null`. An empty list from **Clear** is a valid state and survives reload, so nothing restores the presets except **Reset**.
+- The undo/redo stacks are `transient` (Gson must not serialize them) and `Rule` is mutable, so a snapshot has to deep-copy each rule — `copyOfRules()` — or undo rewires the same objects it just saved.
+- `load()` migrates a v3 `blockRules`/`pickupRules` split into `rules` **before** `sanitize()` runs, from the raw `JsonObject`. There is no v2 (`oreDrops`/`disabledOres`) path — such a file yields `rules == null`, so `sanitize()` fills in `defaultRules()`; raise `CURRENT_VERSION` in the same change as a new field and add the branch if a shipped version ever needs it.
+- A new trigger belongs to `RULE_TRIGGERS`, `SpecialistDanceClient` and `OreTriggersScreen` in the same change; `hasTrigger(trigger)` gates the whole scan, so a trigger no rule uses costs nothing.
 
 ### ModMenu
 

@@ -1,20 +1,31 @@
 # Changelog
 
-## Unreleased
+## 1.6.0
 
-Animation speed + config hardening + Mod Menu. The dance can be played faster or slower
-from the **K** menu; out-of-range config values are now clamped instead of trusted.
+Your rules + animation speed + Mod Menu. The dance now fires on rules you write — mine a
+block, pick up an item, kill a mob or open a container — and it can be played faster or
+slower from the **K** menu; out-of-range config values are clamped instead of trusted.
 
+- Added: `rules` in the config file — a list of `{trigger, source, item, enabled}` entries
+  that replaces the hardcoded ore → drop map. Triggers are `mined` (this block yields this
+  item), `pickup` (this item from anywhere), `mob` (this mob drops it) and `container`
+  (this block gives it to you). A file that has no `rules` key starts from the ten ore
+  presets; a `blockRules`/`pickupRules` split from an interim build is folded in on load.
+- Added: **Your rules** screen on the **Rules** pane — a **Trigger** selector, **Source**
+  and **Item** fields with TAB autocomplete that matches the part after the `:`, and
+  **Pick mob** / **Pick block** / **Pick item** grids paged over the live registries.
+- Added: **Undo** and **Redo** in **Your rules** (`Ctrl/Cmd+Z` and `Ctrl/Cmd+Y`), 40 steps
+  deep, covering add, delete, toggle, clear and reset.
 - Added: `animationSpeed` config field and an **Animation speed** slider in the **K**
   menu, from `0.1x` to `10.0x` — a GIF that imports too slow can be sped up without
   touching its `pack.json`.
 - Added: `speedMultiplier` in `pack.json`, so one pack can carry its own playback speed.
   It overrides the global slider rather than multiplying with it, matching how
   `frameDurationMs` already overrides the global timing.
-- Added: `configVersion` in the config file, with a `migrate()` hook that runs on load.
-  A file written before the key existed is detected as version `0` and stamped current,
-  because Gson applies field initialisers before binding and would otherwise report a
-  v0 file as v1.
+- Added: `configVersion` in the config file, with a `migrate()` hook that runs on load; the
+  stamp is `4` in this release. A file written before the key existed is detected as version
+  `0` and stamped current, because Gson applies field initialisers before binding and would
+  otherwise report a v0 file as v1.
 - Added: every numeric config field now has an upper bound as well as a lower one, so a
   stray extra zero (`frameDurationMs: 50000`) is clamped rather than hanging the trigger
   pipeline; an `animationEndBehavior` outside `stop`/`hold`/`loop` falls back to `stop`.
@@ -27,9 +38,29 @@ from the **K** menu; out-of-range config values are now clamped instead of trust
   `com.sebas.specialistdance.config`; the config file path is unchanged.
 - Changed: frame timing now rounds instead of truncating, and floors at 1 ms, so a fast
   multiplier cannot divide a duration down to zero.
-- Note: none of the above has been observed in-game yet — see `ROADMAP.md` Phase 7.
+- Changed: the **K** menu is two panes — a sidebar of **Music**, **Dance**, **Animation**,
+  **Rules** and **Content** beside one column of rows. The music and dance pickers are
+  scrollable lists of the real files in `config/specialist-dance/`, replacing the duplicate
+  **Music track** `CycleButton`, and the **Dance** pane previews the selected pack live.
+- Changed: the ore list on the **Rules** pane became a rule editor — each row carries its
+  own enable box, the source's item icon and both ids; left-click toggles, right-click
+  deletes.
+- Fixed: `normalizeOreId()` accepts ids containing `_`. Previously every vanilla id with an
+  underscore was rejected, so the ten preset ore rules were deleted on every load and a mob
+  or container rule could never be saved.
+- Fixed: a rejected rule names the field it wants (`mob id must look like
+  minecraft:zombie`) instead of one generic block-id message, and the red notice clears when
+  you type, pick or delete.
+- Fixed: the **Trigger** row shows `mine`, `pickup`, `kill` and `open` instead of echoing the
+  raw value back as `Trigger: mob`.
+- Note: `ROADMAP.md` Phases 7 and 8 record what has been observed in-game — `mob` and
+  `container` have fired; a `mined` activation and a `pickup` match are still undocumented.
 - Known: the **Animation speed** slider has no effect on a pack that declares its own
   `speedMultiplier`.
+- Known: `mined` and `pickup` wait for the item to reach you, so breaking a block in Creative
+  does not dance.
+- Known: **Clear** empties the rule list and nothing re-seeds it on load — **Reset** writes
+  the ten preset ore rules back.
 
 ## 1.5.0
 
