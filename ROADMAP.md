@@ -84,6 +84,7 @@ tracks.
 **Time:** 2026-10-10 → 2026-10-11 (2 days) · **Commits:** `a39c544` `26f7ac1` `f6068f3` `8fe1c6f` · **Tag:** `v1.0.0` 2026-10-11
 **Progress:** 4/4 done.
 
+**What shipped:**
 - Fabric mod scaffold: Gradle + wrapper, `fabric.mod.json`, `SpecialistDanceClient` entrypoint.
 - Diamond-in-inventory detection and the 147-frame HUD overlay (`HudElementRegistry.addLast`).
 - Animation frames packaged under `assets/specialist-dance/textures/gui/frames/`.
@@ -94,9 +95,13 @@ tracks.
 **Time:** 2026-10-12 (1 day) · **Commits:** `f2c1de4` `c0c1eeb` `3ead64c` `f38b839` · **Tag:** `v1.1.0` 2026-10-12
 **Progress:** 3/3 done.
 
-- Diamond-only check refactored into multi-item tracking: diamond, emerald, raw gold,
-  raw iron, gold nugget, ancient debris.
-- First pickup hook: `ClientPacketListenerMixin` + `specialist-dance.client.mixins.json`.
+**What shipped:**
+- Diamond-only check refactored into multi-item tracking: ten `TRACKED_ITEMS` — diamond, emerald,
+  gold, iron and netherite, each in both ingot/gem and block form.
+- Detection stayed a per-tick inventory count (`checkForDiamonds` → `checkForValuableItems`); this
+  phase has no pickup hook — `ClientPacketListenerMixin` and
+  `specialist-dance.client.mixins.json` arrive in Phase 3. (`git ls-tree v1.1.0 -- src/main/java`
+  lists one java file, and the mixins json does not exist at that tag.)
 - Version bump and README rewritten for multi-item behavior.
 
 ## Phase 3 — v1.2.0: Better Detection ✅
@@ -104,6 +109,12 @@ tracks.
 **Time:** 2026-10-15 → 2026-10-18 (4 days) · **Commits:** `2c251f9` `bda6080` `2bc9bb2` · **Tag:** `v1.2.0` 2026-10-18
 **Progress:** 9/9 built · QA 1 of 7 scenarios verified → open debt.
 
+**What shipped:**
+- First pickup hook: `ClientPacketListenerMixin` on `ClientPacketListener.handleTakeItemEntity`,
+  plus `specialist-dance.client.mixins.json`. This belongs here and not in Phase 2, where neither
+  the mixin class nor the mixins json exists at `v1.1.0`.
+- `TRACKED_ITEMS` narrowed from ten ingots and blocks to the six ore drops the ore → drop mapping
+  produces: diamond, emerald, raw gold, raw iron, gold nugget, ancient debris.
 - Origin-aware trigger: `ClientPlayerBlockBreakEvents.AFTER` records the broken ore,
   `expectedDrop()` maps ore → drop (deepslate + nether variants), proximity + expected
   item links the drop, mixin pickup fires the dance.
@@ -118,6 +129,7 @@ tracks.
 **Time:** 2026-10-19 → 2026-10-23 (5 days) · **Commits:** `8da1d3e` `26ad4fb` `bd9678a` `d9f34ea` `bb05212` · **Tag:** `v1.3.0` 2026-10-23
 **Progress:** 7/7 done.
 
+**What shipped:**
 - `audio/MusicManager` — OpenAL + STB Vorbis playback started from `triggerDance()`.
 - Bundled `assets/specialist-dance/sounds/default.ogg`; user tracks scanned from
   `config/specialist-dance/music/`, `default` reserved.
@@ -134,6 +146,7 @@ tracks.
 **Time:** 2026-10-24 (1 day) · **Commit:** `4de2f09` · **Tag:** `v1.3.1` 2026-10-24
 **Progress:** 5/5 done.
 
+**What shipped:**
 - `javasound-mp3`, `javasound-flac`, `tritonus-share` bundled jar-in-jar.
 - Scan `.ogg` `.wav` `.aiff` `.aif` `.au` `.mp3` `.flac`; non-OGG decoded through
   `javax.sound.sampled.AudioSystem` and uploaded to OpenAL; OGG path unchanged.
@@ -372,9 +385,9 @@ want a jar that does not carry the bundled animation, and GitHub wants the one t
   in-game checks are still missing. The `v1.6.1-rc1` tag and release were folded into this one so the
   pre-release line carries exactly one artifact set; `v1.6.2` was cut and retired the same day.
 - `build.gradle` reads `modVariant` (`full` is the default, `lite` strips content) and folds it into
-  `base.archivesName` beside `minecraft_version` and the loader, so a file name states what it is:
-  `specialist-dance-1.21.11-fabric-1.6.1.jar` and
-  `specialist-dance-1.21.11-fabric_lite-1.6.1.jar`.
+  `base.archivesName` beside the version, the loader and `minecraft_version`, so a file name states
+  what it is: `specialist-dance-v1.6.1-fabric-1.21.11.jar` and
+  `specialist-dance-v1.6.1-fabric_lite-1.21.11.jar`.
 - `processResources` excludes `assets/specialist-dance/textures/gui/frames/**` and
   `assets/specialist-dance/sounds**` on `lite`, and takes the variant as an `inputs.property` so a
   cached task cannot answer for the other content set.

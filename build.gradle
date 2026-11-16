@@ -18,7 +18,11 @@ def modVariant = (findProperty('modVariant') ?: 'full') as String
 def variantSuffix = modVariant == 'full' ? '' : '_' + modVariant
 
 base {
-    archivesName.set("${project.archives_base_name}-${project.minecraft_version}-fabric${variantSuffix}".toString())
+    archivesName.set("${project.archives_base_name}-v${project.version}-fabric${variantSuffix}-${project.minecraft_version}".toString())
+}
+
+tasks.withType(org.gradle.api.tasks.bundling.AbstractArchiveTask).configureEach {
+    archiveVersion.set("")
 }
 
 dependencies {

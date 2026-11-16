@@ -109,7 +109,7 @@ Client-only Fabric mod for Minecraft 1.21.11. It plays a 147-frame dance overlay
 ### Build variants
 
 - `modVariant` is build-time only — nothing about it reaches the jar. The code detects content with a resource probe (`DanceRegistry.BUNDLED_PRESENT` on `frame_000.png`, `MusicManager.BUNDLED_PRESENT` on `default.ogg`). Do not add a generated flag, a `fabric.mod.json` field or a config key for it.
-- `base.archivesName` must **not** contain `mod_version`: Gradle appends the project version. It carries `minecraft_version` and `fabric` so a file name states its target.
+- `base.archivesName` carries the version, the loader, the variant and `minecraft_version` (`specialist-dance-v1.6.1-fabric-1.21.11.jar`); the archive tasks clear `archiveVersion` so Gradle does not append the project version a second time.
 - `processResources` takes `inputs.property "variant"`, so switching variants invalidates the cache. A jar with the wrong content set means an exclude pattern broke, not the fingerprint.
 - `DanceRegistry.find()` must stay total: it answers with the zero-frame `NO_DANCE` instead of `null` or a bundled dance that is not in the jar, which is what keeps every caller free of null checks. A caller that assumes `frameCount() > 0` re-opens the lite crash.
 - On a lite install with no packs, `getAvailableDances()` and `getAvailableTracks()` are empty; guard `get(0)` before building a `NameList`, and never let a trigger write `lastTriggerMillis` before a dance is known.

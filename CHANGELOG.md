@@ -8,9 +8,9 @@ CurseForge/Modrinth jar without them, so content is not shipped twice.
 
 - Added: the `modVariant` build property — `full` (default) keeps all 147 bundled frames and the
   bundled `.ogg`, `lite` excludes them in `processResources`.
-- Added: the jar name carries the Minecraft version, the loader and the variant —
-  `specialist-dance-1.21.11-fabric-1.6.1.jar` and
-  `specialist-dance-1.21.11-fabric_lite-1.6.1.jar`.
+- Added: the jar name carries the version, the loader, the variant and the Minecraft version —
+  `specialist-dance-v1.6.1-fabric-1.21.11.jar` and
+  `specialist-dance-v1.6.1-fabric_lite-1.21.11.jar`.
 - Added: `DanceRegistry.NO_DANCE` — a zero-frame `none` sentinel, so `find()` still answers when
   nothing is installed and no caller has to null-check.
 - Added: the **Music** and **Dance** panes say which folder to drop files into when their list is
@@ -213,39 +213,66 @@ in-game yet — see `ROADMAP.md` Phase 5.
 
 ## 1.3.1
 
+More audio formats. Custom music now accepts Ogg Vorbis, WAV, AIFF, AU, MP3 and FLAC, on top of
+the bundled `default` track.
+
 - Changed: custom music supports Ogg Vorbis, WAV, AIFF (`.aiff`/`.aif`), AU,
   MP3 and FLAC files.
 - Known: Ogg Opus and ALAC are not supported.
 
 ## 1.3.0
 
+Dance-triggered music. A dance now plays a bundled `default` track, and the **K** settings screen
+lets you enable music, set its volume, pick a track and preview it.
+
 - Added: dance-triggered music with a bundled `default` Ogg Vorbis track.
-- Added: music settings screen opened with **K** — enable/disable music, adjust volume, select a track, preview it and stop playback.
-- Added: custom music support from `.minecraft/config/specialist-dance/music/`. Filenames become track names and `default` is reserved for the bundled track.
+- Added: music settings screen opened with **K** — enable/disable music, adjust volume, select a
+  track, preview it and stop playback.
+- Added: custom music support from `.minecraft/config/specialist-dance/music/`. Filenames become
+  track names and `default` is reserved for the bundled track.
 - Added: `musicEnabled`, `musicVolume` and `musicTrack` config fields.
-- Added: fallback to the bundled `default` track when the selected custom track is missing or cannot be loaded.
-- Changed: music restores the previous OpenAL context after playback and shutdown instead of clearing it.
+- Added: fallback to the bundled `default` track when the selected custom track is missing or
+  cannot be loaded.
+- Changed: music restores the previous OpenAL context after playback and shutdown instead of
+  clearing it.
 - Changed: buffer loading and shutdown now guard OpenAL context and object IDs.
 - Fixed: shutdown no longer clears Minecraft's active OpenAL context.
 - Fixed: tracks with more than two channels are downmixed to stereo for playback.
-- Known: custom music supports Ogg Vorbis only; Ogg Opus, MP3, WAV, FLAC and ALAC are not supported yet.
+- Known: custom music supports Ogg Vorbis only; Ogg Opus, MP3, WAV, FLAC and ALAC are not
+  supported yet.
 
 ## 1.2.0
 
-- Changed: the trigger is now origin-aware — the dance only plays when you mine a valuable ore and pick up that ore's drop (chests, trades, mobs and pre-existing ground items no longer trigger it).
-- Added: pickup detection via a Mixin on `ClientPacketListener.handleTakeItemEntity` (local player only, matched by entity id).
-- Fixed: drop association now reads the item stack on a later client tick, because the spawn packet arrives before the item data.
-- Added: `config/specialist-dance.json` — enabled/debug toggles, association timeouts and radius, and animation duration/size/position/cooldown.
+Origin-aware triggering. The dance now fires only when you mine a valuable ore and then pick up
+that ore's drop, so chests, trades, mobs and pre-existing ground items stop triggering it.
+
+- Added: pickup detection via a Mixin on `ClientPacketListener.handleTakeItemEntity` (local
+  player only, matched by entity id).
+- Added: `config/specialist-dance.json` — enabled/debug toggles, association timeouts and radius,
+  and animation duration/size/position/cooldown.
+- Changed: the trigger is now origin-aware — the dance only plays when you mine a valuable ore and
+  pick up that ore's drop (chests, trades, mobs and pre-existing ground items no longer trigger it).
+- Changed: `TRACKED_ITEMS` narrowed from ten ingots and blocks to the six ore drops — diamond,
+  emerald, raw gold, raw iron, gold nugget and ancient debris.
 - Changed: diagnostic logging is now gated behind `"debug": true`.
+- Fixed: drop association now reads the item stack on a later client tick, because the spawn
+  packet arrives before the item data.
 
 ## 1.1.0
 
-- Changed: the diamond check became multi-item tracking — diamond, emerald, raw gold,
-  raw iron, gold nugget and ancient debris.
-- Added: first pickup hook, a Mixin on `ClientPacketListener.handleTakeItemEntity`.
+Multi-item tracking. The single diamond check became a ten-item list of gems, ingots and their
+blocks, matched by comparing inventory counts from one tick to the next.
+
+- Added: `TRACKED_ITEMS` — diamond, emerald, gold, iron and netherite, each in both ingot/gem and
+  block form.
+- Changed: detection diffs per-item counts across ticks (`checkForDiamonds` →
+  `checkForValuableItems`); there is no pickup hook yet, that arrives in 1.2.0.
 - Changed: README updated for multi-item behavior.
 
 ## 1.0.0
 
-- Initial release: diamond detection and the 147-frame Specialist Dance HUD overlay,
-  with the animation frames, icon and mod metadata packaged in the jar.
+Initial release. Mining a diamond plays the 147-frame Specialist Dance HUD overlay, with the
+frames, icon and mod metadata packaged in the jar.
+
+- Added: diamond detection and the 147-frame Specialist Dance HUD overlay.
+- Added: the animation frames, icon and mod metadata packaged in the jar.
