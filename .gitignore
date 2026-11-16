@@ -6,3 +6,7 @@ run/
 extract_gif.py
 *.log
 .qoder/repowiki/
+
+# Third-party dance frames and track. Kept on this machine for the `full` build,
+# never committed and never published.
+content/

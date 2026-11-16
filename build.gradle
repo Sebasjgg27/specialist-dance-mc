@@ -14,8 +14,20 @@ repositories {
     }
 }
 
-def modVariant = (findProperty('modVariant') ?: 'full') as String
+def modVariant = (findProperty('modVariant') ?: 'lite') as String
 def variantSuffix = modVariant == 'full' ? '' : '_' + modVariant
+
+// The dance frames and the bundled track are third-party content: they are not
+// distributed by this repository, so only a local `content/` folder can supply them.
+def bundledContent = file('content')
+def hasBundledContent = new File(bundledContent, 'assets/specialist-dance/textures/gui/frames').isDirectory() &&
+    new File(bundledContent, 'assets/specialist-dance/sounds/default.ogg').isFile()
+
+if (modVariant == 'full' && !hasBundledContent) {
+    throw new GradleException('modVariant=full needs content/ with the dance frames and default.ogg, which this repository does not carry. Run ./gradlew build for the content-free jar that gets published.')
+}
+
+sourceSets.main.resources.srcDir(bundledContent)
 
 base {
     archivesName.set("${project.archives_base_name}-v${project.version}-fabric${variantSuffix}-${project.minecraft_version}".toString())
@@ -45,6 +57,7 @@ dependencies {
 processResources {
     inputs.property "version", project.version
     inputs.property "variant", modVariant
+    inputs.files bundledContent
 
     if (modVariant == 'lite') {
         exclude 'assets/specialist-dance/textures/gui/frames/**'
@@ -62,6 +75,11 @@ java {
     }
 
     withSourcesJar()
+}
+
+tasks.named('sourcesJar') {
+    exclude 'assets/specialist-dance/textures/gui/frames/**'
+    exclude 'assets/specialist-dance/sounds**'
 }
 
 tasks.withType(JavaCompile).configureEach {

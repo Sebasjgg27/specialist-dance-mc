@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased
+
+Publishing without the bundled content. The dance frames and the `default` track leave the
+repository, and the jar a stranger builds from a clone is the content-free one.
+
+- Changed: `./gradlew build` defaults to `modVariant=lite`, so what a clone produces carries
+  no dance and no music; `full` is now the opt-in, local-only build.
+- Changed: the 147 frames and `default.ogg` moved out of `src/main/resources/` into a
+  gitignored `content/` folder that `build.gradle` adds as a resources source directory — a
+  local `full` build still yields the same jar, and the repository no longer carries the
+  third-party files.
+- Added: a `GradleException` when `-PmodVariant=full` runs without `content/`, so a machine
+  with no third-party content cannot build a jar that pretends it has it.
+- Added: the same two `exclude` patterns on `sourcesJar`; `withSourcesJar()` packs the
+  resources source directories, so a sources jar re-shipped all 147 frames and the track even
+  when the mod jar did not.
+- Fixed: `MusicManager.extensionOf()` and `readTrackBytes()` took the bundled branch for the
+  track name `default` without checking `BUNDLED_PRESENT`, so in a content-free build a user's
+  `music/default.ogg` was listed but could never load.
+- Note: the content remains in the git history and in the published v1.0.0–v1.6.1 jars;
+  clearing history would move the tags those releases point at, and v1.4.0 is deliberately
+  left as published.
+
 ## 1.6.1
 
 Two release artifacts + empty-content safety. `./gradlew build` produces the GitHub jar with the

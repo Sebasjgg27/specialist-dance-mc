@@ -414,7 +414,7 @@ public class MusicManager {
     }
 
     private String extensionOf(String trackName) {
-        if (BUNDLED_NAME.equals(trackName)) {
+        if (BUNDLED_PRESENT && BUNDLED_NAME.equals(trackName)) {
             return "ogg";
         }
 
@@ -616,7 +616,7 @@ public class MusicManager {
 
     private byte[] readTrackBytes(String trackName) {
         try {
-            if (BUNDLED_NAME.equals(trackName)) {
+            if (BUNDLED_PRESENT && BUNDLED_NAME.equals(trackName)) {
                 try (InputStream in = MusicManager.class.getResourceAsStream(BUNDLED_RESOURCE)) {
                     return in == null ? null : in.readAllBytes();
                 }

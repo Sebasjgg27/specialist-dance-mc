@@ -14,15 +14,15 @@ Client-only Fabric mod for Minecraft 1.21.11. It plays a 147-frame dance overlay
 ## Commands
 
 ```bash
-./gradlew build                          # full jar (bundled dance + track) in build/libs/
-./gradlew build -PmodVariant=lite        # lite jar, ships without bundled content
-./gradlew runClient                      # dev client
-./gradlew runClient -PmodVariant=lite    # dev client as the lite build ships
+./gradlew build                          # content-free jar in build/libs/ — this is what gets published
+./gradlew build -PmodVariant=full        # local jar; needs content/ with the frames and default.ogg
+./gradlew runClient                      # dev client with no bundled content
+./gradlew runClient -PmodVariant=full    # dev client with the local content/ dance and track
 ./gradlew compileJava                    # fast compile check
 ```
 
 - There are **no automated tests** (`test` is `NO-SOURCE`); validation is `./gradlew build` plus in-game QA.
-- Every release builds **both** variants; `full` goes to GitHub, `lite` goes to CurseForge/Modrinth.
+- **Never publish a build that carries the default dance or the default track.** GitHub, CurseForge and Modrinth all get the content-free jar; the `full` jar exists only on this machine, because the animation frames and the music are third-party content this project does not own.
 - Always use the bundled wrapper, target Java 21 (Gradle toolchain handles it; the machine default JDK may be newer).
 - If a stale `~/.gradle/caches/fabric-loom/*.lock` contains `disowned`, delete it and let the next build rebuild the Loom cache.
 
@@ -41,7 +41,8 @@ Client-only Fabric mod for Minecraft 1.21.11. It plays a 147-frame dance overlay
 - `src/main/java/com/sebas/specialistdance/config/menu/ItemGridScreen.java` — creative-style picker over a supplied id list with an `iconOf` function, so one grid serves `BuiltInRegistries.ITEM`, `BLOCK` and `ENTITY_TYPE`: filter box, paged icon grid, returns the chosen id through a callback.
 - `src/main/java/com/sebas/specialistdance/integration/ModMenuIntegration.java` — ModMenu entrypoint that opens the config screen.
 - `src/main/java/com/sebas/specialistdance/mixin/ClientPacketListenerMixin.java` — player pickup detection.
-- `src/main/resources/` — `fabric.mod.json`, mixin config, lang files, animation frames, bundled `sounds/default.ogg`.
+- `src/main/resources/` — `fabric.mod.json`, mixin config, lang files, icon.
+- `content/` — the third-party dance frames and `sounds/default.ogg`, **gitignored**: it is a local folder that `build.gradle` adds as a resources source directory, so the `full` variant can be built here without the content ever entering the repository.
 - `tools/` — dev-only, never shipped: `GifToFrames.java` (`java tools/GifToFrames.java <in.gif> <out-dir> [maxSize]` exports a GIF into a `frame_%03d.png` dance pack).
 - `ROADMAP.md` / `CHANGELOG.md` / `README.md` — phase plan, release history, user docs.
 
@@ -109,11 +110,13 @@ Client-only Fabric mod for Minecraft 1.21.11. It plays a 147-frame dance overlay
 ### Build variants
 
 - `modVariant` is build-time only — nothing about it reaches the jar. The code detects content with a resource probe (`DanceRegistry.BUNDLED_PRESENT` on `frame_000.png`, `MusicManager.BUNDLED_PRESENT` on `default.ogg`). Do not add a generated flag, a `fabric.mod.json` field or a config key for it.
+- The default is `lite`, so `./gradlew build` on a clone cannot produce a jar that carries the dance or the music. `full` reads them from the gitignored `content/` folder and **fails with a `GradleException` when that folder is missing** — do not soften that error into a warning, and do not move the frames or the track back into `src/main/resources/`.
+- `withSourcesJar()` packs the resources source directories too, so `sourcesJar` carries the same two `exclude` patterns; without them a sources jar re-ships the content even when the mod jar does not.
 - `base.archivesName` carries the version, the loader, the variant and `minecraft_version` (`specialist-dance-v1.6.1-fabric-1.21.11.jar`); the archive tasks clear `archiveVersion` so Gradle does not append the project version a second time.
-- `processResources` takes `inputs.property "variant"`, so switching variants invalidates the cache. A jar with the wrong content set means an exclude pattern broke, not the fingerprint.
+- `processResources` takes `inputs.property "variant"` and `inputs.files bundledContent`, so switching variants or adding and removing `content/` invalidates the cache. A jar with the wrong content set means an exclude pattern broke, not the fingerprint.
 - `DanceRegistry.find()` must stay total: it answers with the zero-frame `NO_DANCE` instead of `null` or a bundled dance that is not in the jar, which is what keeps every caller free of null checks. A caller that assumes `frameCount() > 0` re-opens the lite crash.
 - On a lite install with no packs, `getAvailableDances()` and `getAvailableTracks()` are empty; guard `get(0)` before building a `NameList`, and never let a trigger write `lastTriggerMillis` before a dance is known.
 
 ## Release process
 
-Follow `ROADMAP.md`: one release per phase. Update `mod_version` in `gradle.properties`, add a `CHANGELOG.md` entry, update `README.md`, mark the phase complete in `ROADMAP.md`, run `./gradlew build` **and** `./gradlew build -PmodVariant=lite`, test in-game in **Survival**, and only then tag.
+Follow `ROADMAP.md`: one release per phase. Update `mod_version` in `gradle.properties`, add a `CHANGELOG.md` entry, update `README.md`, mark the phase complete in `ROADMAP.md`, run `./gradlew build` **and** `./gradlew build -PmodVariant=full`, test in-game in **Survival**, and only then tag. Publish the content-free jar — the `full` jar stays on this machine.

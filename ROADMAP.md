@@ -379,12 +379,14 @@ placeholder. Not observed either way.
 
 **Time:** 2026-11-14 (1 day) · **Commits:** 5 · **Tag:** `v1.6.1` 2026-11-14, pre-release.
 **Progress:** built and offline-verified; out of the phase plan by rule 6 — CurseForge and Modrinth
-want a jar that does not carry the bundled animation, and GitHub wants the one that does.
+want a jar that does not carry the bundled animation, and GitHub wanted the one that does until
+2026-11-16 (see **Patch — v1.6.1: Content Withdrawal**).
 
 - Numbered `1.6.1` with no `-rc` suffix and published as a GitHub **pre-release**, because the two
   in-game checks are still missing. The `v1.6.1-rc1` tag and release were folded into this one so the
   pre-release line carries exactly one artifact set; `v1.6.2` was cut and retired the same day.
-- `build.gradle` reads `modVariant` (`full` is the default, `lite` strips content) and folds it into
+- `build.gradle` reads `modVariant` (`full` bundles content, `lite` strips it — the default
+  flipped to `lite` on 2026-11-16) and folds it into
   `base.archivesName` beside the version, the loader and `minecraft_version`, so a file name states
   what it is: `specialist-dance-v1.6.1-fabric-1.21.11.jar` and
   `specialist-dance-v1.6.1-fabric_lite-1.21.11.jar`.
@@ -421,6 +423,52 @@ want a jar that does not carry the bundled animation, and GitHub wants the one t
   the **K** menu guards `tracks.get(0)` / `dances.get(0)` and greys **Play preview**, **Preview dance
   on close** and **Position dance**, and each pane names the folder to drop files into. None of it
   has been seen in a running client — see Open debt.
+
+## Patch — v1.6.1: Content Withdrawal 🛠
+
+**Time:** 2026-11-16 (1 day) · **Commits:** none yet · **Tag:** none.
+**Progress:** built and offline-verified; unreleased, and the digests quoted in the `v1.6.1`
+release note no longer describe what `./gradlew build` produces.
+
+- The published jar must not carry the dance or the music. `modVariant` now defaults to
+  `lite`, so `./gradlew build` on a clone cannot yield an artifact with third-party content,
+  and `full` is the opt-in local build.
+- The 147 frames and `default.ogg` left `src/main/resources/` for a gitignored `content/`
+  folder (`.gitignore:12`) that `build.gradle` adds with `sourceSets.main.resources.srcDir`,
+  mirroring the jar layout so the runtime paths in `DanceRegistry.BUNDLED_PROBE`,
+  `DanceTextures` and `MusicManager.BUNDLED_RESOURCE` are untouched.
+- 🧪 2026-11-16 11:03: the default build reproduced the published lite digest
+  `ff001bcdd82582de1432861ecac8f878419de80efff8b45fae20386051d7f9c4` byte for byte, so the
+  srcDir-plus-exclude plumbing equals the exclude-only plumbing it replaced.
+- 🧪 2026-11-16 11:04: `-PmodVariant=full` against the published full jar
+  (`aea25e43…07fe1fc`, 2 038 434 B) gave 205 entries on both sides, 149 content entries on
+  both sides, 0 missing, 0 extra and 0 entries whose CRC-32 or uncompressed size differs — the
+  content moved intact and the rest of the jar is unchanged.
+- `full` refuses to build without `content/`: a `GradleException` naming the folder and
+  pointing at `./gradlew build`. 🧪 2026-11-16 with `content/` renamed away, exit code 1 and
+  the message `modVariant=full needs content/ with the dance frames and default.ogg, which
+  this repository does not carry`; the same tree built the content-free jar at exit 0.
+- `sourcesJar` carries the two excludes now. 🧪 2026-11-16 11:10: 32 entries and 0 content
+  entries at 52 682 B, against 1 552 510 B with 149 content entries before — `withSourcesJar()`
+  packs the resources source directories, so the sources jar had been re-shipping every frame
+  in both variants.
+- `MusicManager.extensionOf()` and `readTrackBytes()` tested `BUNDLED_NAME` without
+  `BUNDLED_PRESENT`, so in a content-free build a user's `music/default.ogg` was listed by
+  `getAvailableTracks()` and then read from the absent jar resource. 🛠 Both sites are guarded
+  and both variants compile; no client has played a `default` track since.
+- 🧪 2026-11-16 11:10 after that Java change: lite 538 609 B `8690229d4788…`,
+  full 2 038 442 B `9b860b8fd2be…` — 8 bytes of class-file growth on each, which is why the
+  release-note digests for `v1.6.1` are now historical.
+- `v1.4.0` keeps its jar. The release note carries the attribution and the statement that the
+  frames and the track are not ours to redistribute; the asset is untouched, digest
+  `9282bc14…576b741` still valid.
+- 🧪 2026-11-16: `## Content and attribution` was added between **Installation** and
+  **Known limitations** on `v1.4.0` (2 596 → 3 225 chars) and `v1.6.1` (3 688 → 4 525 chars)
+  by a `PATCH` on the body alone, with the pre-edit bodies kept and the re-listed prefix,
+  suffix and section order asserted after each call. It credits **The Specialist for Good
+  Items** by Jiftoo, Bombers Kid (Devector) and Mr. Headcrab for *The Binding of Isaac:
+  Rebirth* (`steamcommunity.com/sharedfiles/filedetails/?id=2575911103`), which is live — the
+  `bannedNotification` div on that page is hidden template markup, `style="display: none"`.
 
 ## Phase 9 — v1.8.0: Provable ⬜
 
@@ -556,7 +604,19 @@ Anything 🛠 at release time sits here until it is 🧪.
 - [ ] `v1.6.1`: `DanceRegistry.scan()` and `importGif()` still refuse the name `specialist` in
       the lite build, where there is no bundled dance to reserve it for — a user pack called
       `specialist` is dropped with `is reserved for the bundled dance` and never listed.
-- [ ] `modVariant` is unchecked: `-PmodVariant=ligt` builds a full-content jar named `_ligt`.
+- [ ] `modVariant` is unchecked: `-PmodVariant=ligt` is not `full`, so it now builds a
+      content-free jar named `_ligt`. The name lies; the artifact is publishable.
+- [ ] Content Withdrawal: only the working tree changed. The frames and `default.ogg` are still
+      reachable in git history (`f6068f3`, `8da1d3e`) and inside the nine published jars
+      `v1.0.0`…`v1.6.1`; purging history would move the tags those releases point at, so it is
+      a decision, not a chore.
+- [ ] Content Withdrawal: `assets/specialist-dance/icon.png` is Isaac's sprite — the same class
+      of third-party content — and is still tracked and still inside every published jar.
+- [ ] Content Withdrawal: neither side has been seen in a running client since the move.
+      `./gradlew build -PmodVariant=full` has not danced, and the new default content-free jar
+      has not been loaded from a real `mods/` folder. The offline proof is entry CRCs, not play.
+- [ ] Content Withdrawal: the `BUNDLED_PRESENT` guard on the `default` track name is 🛠 —
+      `music/default.ogg` in a content-free install has never actually played.
 
 ## Out of scope / future ideas
 

@@ -1,9 +1,10 @@
 # Specialist Dance
 
 A **client-side** Fabric mod. When something valuable reaches your inventory, a dance
-animation plays in the middle of your screen — by default the
-147-frame "Specialist" dance meme from *Persona 4* and *The Binding of Isaac*,
-or any animation you add as your own [dance pack](#custom-dances).
+animation plays in the middle of your screen — bring any animation you like as a
+[dance pack](#custom-dances). Published jars ship without a built-in dance: the
+"Specialist" animation this mod was developed against is third-party content and is not
+redistributed with it — see [Content and attribution](#content-and-attribution).
 
 The default rules are origin-aware: digging up a diamond ore and grabbing the diamond
 celebrates, while pulling a diamond out of a chest, trading with a villager or walking
@@ -30,7 +31,8 @@ block, picking up an item, killing a mob or opening a container.
 - **No false positives** — chests, mobs, trades and old ground loot stay silent until you
   write a rule that asks for them.
 - **No double triggers** — a Fortune vein can drop several items but only dances once.
-- **Dance music** — plays a bundled track while the animation is on screen.
+- **Dance music** — plays a track while the animation is on screen: your own, or the one a
+  dance pack carries.
 - **Custom music** — add supported audio files and pick one in the settings
   screen.
 - **Custom dances** — drop a folder of PNG frames in and select it as your dance.
@@ -57,18 +59,19 @@ then holds an empty list, which nothing re-seeds.
 
 1. Install [Fabric Loader](https://fabricmc.net/use/installer/) for 1.21.11
    and **Fabric API**.
-2. Drop `specialist-dance-v1.6.1-fabric-1.21.11.jar` into your `mods/` folder.
+2. Drop `specialist-dance-v1.6.1-fabric_lite-1.21.11.jar` into your `mods/` folder.
 3. Launch the game — you should see `Specialist Dance is Ready!` in the log.
 
-Two artifacts ship, and only the first one carries content:
+The published jar is the mod only:
 
 | Jar | Contains | Needs |
 |---|---|---|
-| `specialist-dance-v1.6.1-fabric-1.21.11.jar` | the bundled `specialist` dance (147 frames) and the `default` track | nothing |
-| `specialist-dance-v1.6.1-fabric_lite-1.21.11.jar` | the mod only | your own dance pack and track in the config folders |
+| `specialist-dance-v1.6.1-fabric_lite-1.21.11.jar` | the mod | your own dance pack and track in the config folders |
 
-The mod is otherwise identical. With the lite jar and nothing installed yet, the **K** menu says
-which folder to drop files into instead of offering a dance that cannot play.
+With nothing installed yet, the **K** menu says which folder to drop files into instead of
+offering a dance that cannot play. A jar that bundles the `specialist` frames and the
+`default` track is a development build and is not distributed — see
+[Content and attribution](#content-and-attribution).
 
 The mod does not need to be installed on the server.
 
@@ -101,7 +104,7 @@ Missing keys fall back to defaults and are added back to the file automatically.
 | `musicVolume` | `1.0` | Music volume from `0.0` to `1.0`. |
 | `musicTrack` | `"default"` | Track name: `default` or a custom filename without its extension. |
 | `animationEndBehavior` | `"stop"` | What happens when the frames run out: `stop` clears the dance, `hold` keeps the last frame, `loop` repeats until the music ends. An unknown value falls back to `stop`. With music off there is no end signal, so `hold` and `loop` both play exactly one pass. |
-| `activeDance` | `"specialist"` | Dance to play: `specialist` (bundled) or a folder name from the dances folder. |
+| `activeDance` | `"specialist"` | Dance to play: a folder name from the dances folder. The default names the bundled `specialist` dance, which the published jar does not carry — with nothing installed the mod plays nothing and the **K** menu tells you which folder to fill. |
 | `configVersion` | `4` | Schema stamp for the file. A file written before this key existed is detected as version `0` and upgraded on load; a `blockRules`/`pickupRules` split from an interim build is folded into `rules`. You do not need to touch it. |
 
 `drawSize`, `stageWidth` and `stageHeight` are still written to the file, but nothing
@@ -153,7 +156,8 @@ entity**. The ten presets need **Survival** to fire at all.
 
 Music starts when a dance triggers and stops when the animation ends.
 
-- `default` is the bundled track.
+- `default` is the bundled track, which the published jar does not carry — until you add
+  audio there is nothing to play.
 - To add your own music, put `.ogg` (Vorbis), `.wav`, `.aiff`, `.aif`, `.au`,
   `.mp3`, or `.flac` files in:
 
@@ -166,7 +170,9 @@ Music starts when a dance triggers and stops when the animation ends.
 - A dance pack can also carry its own audio file; see
   [Custom dances](#custom-dances). Pack tracks appear in the selector as
   `<pack>/<track>`.
-- `default` is reserved for the bundled track.
+- `default` names the bundled track. In a development build it shadows a file of that name
+  in your music folder; the published jar carries no bundled track, so there `default.ogg`
+  is simply your own track.
 - Press **K** in-game with no other screen open to change the track, volume or
   music setting.
 - The settings screen also has **Play preview** and **Stop** buttons.
@@ -176,8 +182,8 @@ up by **Rescan** (see below) or on the next launch.
 
 ## Custom dances
 
-The bundled animation is named `specialist`. The easiest way to add your own is to
-drop an animated GIF into the dances folder:
+The published jar has no animation in it, so your first dance is one you add. The easiest way
+is to drop an animated GIF into the dances folder:
 
 ```text
 .minecraft/config/specialist-dance/dances/mydance.gif
@@ -250,7 +256,7 @@ Press **K** (with no other screen open). The screen is two panes: a sidebar of *
 | Pane | Controls |
 | --- | --- |
 | **Music** | **Music Enabled**, the volume slider, **Play preview** / **Stop**, a scrollable list of every track in `config/specialist-dance/music`, **Open music folder** |
-| **Dance** | **Preview dance on close**, **Position dance**, a scrollable list of the bundled `specialist` plus your packs, and a live preview of the selected one |
+| **Dance** | **Preview dance on close**, **Position dance**, a scrollable list of your packs (plus the bundled `specialist` in a development build), and a live preview of the selected one |
 | **Animation** | **End behavior** (`stop` / `hold` / `loop`) and the **Animation speed** slider |
 | **Rules** | **Your rules** — the rule editor, see [Writing rules](#writing-rules) |
 | **Content** | **Open music folder**, **Open dances folder**, **Rescan** |
@@ -337,15 +343,26 @@ screen, or check that the animation is actually finishing.
 Prerequisites: JDK 21 and Git. Gradle is included in the repo.
 
 ```sh
-./gradlew build                          # full jar lands in build/libs/
-./gradlew build -PmodVariant=lite        # same, without the bundled dance and track
-./gradlew runClient                      # launch a dev client
-./gradlew runClient -PmodVariant=lite    # dev client as the lite build ships
+./gradlew build                          # content-free jar lands in build/libs/
+./gradlew build -PmodVariant=full        # same code plus the local content/ dance and track
+./gradlew runClient                      # launch a dev client with no bundled content
+./gradlew runClient -PmodVariant=full    # dev client with the bundled content
 ./gradlew build --offline                # when your dependencies are already cached
 ```
 
 The first build needs network access to Fabric's Maven and Mojang's version
 manifest.
+
+The dance frames and the `default` track are not in this repository. `-PmodVariant=full`
+reads them from a gitignored `content/` folder that mirrors the jar layout:
+
+```text
+content/assets/specialist-dance/textures/gui/frames/frame_000.png … frame_146.png
+content/assets/specialist-dance/sounds/default.ogg
+```
+
+Without that folder the `full` build stops with an error, so a machine that has no
+third-party content cannot accidentally produce a jar that ships it.
 
 ## Project files
 
@@ -367,8 +384,9 @@ manifest.
 - `integration/ModMenuIntegration.java` — opens the settings screen from Mod Menu.
 - `mixin/ClientPacketListenerMixin.java` — reports pickups of the local
   player.
-- `assets/specialist-dance/` — icon, bundled music and the 147 animation
-  frames.
+- `assets/specialist-dance/` — icon and language files.
+- `content/` — the dance frames and `default.ogg`, gitignored and therefore absent from a
+  clone; only `-PmodVariant=full` reads them.
 - `tools/GifToFrames.java` — converts an animated GIF into a dance pack (dev-only).
 
 ## Technical notes
@@ -411,6 +429,21 @@ Bug reports, tests and pull requests are welcome — see
 [CONTRIBUTING.md](CONTRIBUTING.md) for setup, coding and testing guidelines.
 Release history lives in [CHANGELOG.md](CHANGELOG.md).
 
+## Content and attribution
+
+The dance animation and the music are not ours. The frames are the Specialist dance that
+circulates on the internet, and the `default` track is audio we do not own either. Both were
+bundled only to test the mod, and this project has no right to license or redistribute them,
+so no published jar carries them: they live in the untracked `content/` folder described
+under [Building & running](#building--running). The mod icon is third-party art as well and
+stays in the jar only until it is replaced.
+
+This mod was inspired by **The Specialist for Good Items** by Jiftoo, Bombers Kid (Devector)
+and Mr. Headcrab for *The Binding of Isaac: Rebirth*
+([steamcommunity.com/sharedfiles/filedetails/?id=2575911103](https://steamcommunity.com/sharedfiles/filedetails/?id=2575911103))
+— the original authors of the dance, the music and the idea. All credit belongs to them.
+
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). The licence covers the code in this repository, not the
+third-party animation, audio or icon described above.
