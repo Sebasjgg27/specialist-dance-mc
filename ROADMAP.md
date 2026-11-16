@@ -388,6 +388,20 @@ want a jar that does not carry the bundled animation, and GitHub wants the one t
   `base.archivesName` beside the version, the loader and `minecraft_version`, so a file name states
   what it is: `specialist-dance-v1.6.1-fabric-1.21.11.jar` and
   `specialist-dance-v1.6.1-fabric_lite-1.21.11.jar`.
+- 🧪 2026-11-16 10:12–10:18: the scheme was retro-fitted onto the published catalogue rather than
+  left for the next build. All 12 assets across `v1.0.0`…`v1.6.1` were renamed by a `PATCH` on the
+  asset `name` field alone, and the re-listed sizes and `sha256` digests came back identical to the
+  values captured immediately before (`62dce6e6…d55d0f59` at 2 037 464 B for `v1.6.0`,
+  `ad6469a2…c2a7eb8de` at 1 953 179 B for `v1.3.1`), so nothing was re-uploaded and the digests
+  quoted in each release note still describe the bytes a player downloads. Every body now names its
+  own jar, and `v1.0.0`–`v1.3.0` gained the theme phrases their titles never had. The
+  `specialist-dance-1.6.0.jar` in the 2026-11-14 housekeeping note above is left as written — it
+  records the name uploaded that day, which reads `specialist-dance-v1.6.0-fabric-1.21.11.jar` now.
+- Asset URLs move with the names (`/releases/download/<tag>/<file>`), so a third-party link to a
+  bare `specialist-dance-X.Y.Z.jar` now 404s. Nothing here linked one: `releases/download` does not
+  appear in any markdown file in the repo, and the two `-sources.jar` assets on `v1.1.0` and
+  `v1.3.0` were renamed in place rather than removed, and are now called out as optional in those
+  notes.
 - `processResources` excludes `assets/specialist-dance/textures/gui/frames/**` and
   `assets/specialist-dance/sounds**` on `lite`, and takes the variant as an `inputs.property` so a
   cached task cannot answer for the other content set.
